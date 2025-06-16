@@ -1,0 +1,16 @@
+Rapport d'Avancement - Ligne Paris-Lyon (T1 2024)
+
+Date : 10 mars 2024
+Etat global du projet : En bonne voie
+Avancement : 68%
+
+Realisations :
+- Finalisation des travaux de signalisation dans le secteur de Montereau.
+- Deploiement de la fibre optique termine entre Melun et Dijon.
+- Phase de tests du nouveau systeme d'affichage voyageurs : 80% complete.
+
+Risques :
+- Retard dans la livraison du materiel pour les portiques de securite (impact estime : 2 semaines)
+- Reorganisation interne prevue cote fournisseur Siemens, risque de perte de continuite.
+
+Prochain jalon : mise en service partielle du systeme d'information voyageurs le 20 avril 2024.

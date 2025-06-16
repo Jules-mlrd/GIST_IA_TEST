@@ -1,0 +1,12 @@
+Specifications Techniques - Ligne Paris-Lyon (Version 2.1)
+
+Derniere mise a jour : 8 mars 2024
+
+Modifications apportees :
+- Ajout d'un module de redondance pour les serveurs embarques.
+- Changement du protocole de communication entre les unites de controle (TCP/IP securise).
+- Hauteur des ecrans LED : standardisee a 2.10 metres au lieu de 2.30 metres.
+
+Exigences :
+- Resistance aux variations de temperature : -20C a +60C
+- Systeme de secours operationnel sous 5 secondes

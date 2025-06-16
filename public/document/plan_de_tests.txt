@@ -1,0 +1,17 @@
+Plan de Tests - Ligne Paris-Lyon
+
+Objectif :
+Verifier le bon fonctionnement des equipements installes avant la mise en service.
+
+Tests prevus :
+1. Verification du fonctionnement des signaux lumineux (jour/nuit)
+2. Test de redondance des serveurs embarques
+3. Affichage correct des horaires en gare
+4. Simulation de panne et basculement automatique
+5. Accessibilite des equipements pour les personnes a mobilite reduite
+
+Date prevue de campagne de test : 2 au 10 avril 2024
+Responsable : Claire Dupuis - Chef de mission qualite
+
+Remarques :
+Chaque test doit etre valide par un double controle (maitre d'oeuvre + maitrise d'ouvrage).

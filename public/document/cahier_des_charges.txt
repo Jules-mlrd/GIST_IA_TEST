@@ -1,0 +1,15 @@
+Cahier des Charges - Ligne Paris-Lyon
+
+Client : GISM
+Date de redaction : 15 janvier 2024
+
+Objectifs :
+- Modernisation des systemes de signalisation et d'affichage.
+- Amelioration de l'information voyageurs et de la securite.
+
+Contraintes :
+- Travaux uniquement realisables de nuit (23h00 a 5h00).
+- Maintien de la circulation des trains pendant toute la duree du chantier.
+
+Budget previsionnel : 12.4 millions d'euros
+Duree estimee du projet : 18 mois
