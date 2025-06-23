@@ -1,8 +1,11 @@
 import { fetchPdfTextFromS3, listPdfFilesInS3 } from '@/lib/readPdf';
 import { listTxtFilesInS3, fetchTxtContentFromS3 } from '@/lib/readTxt';
+import { parseStructuredFile } from '@/lib/readCsv';
 import fs from 'fs';
 import path from 'path';
 import { NextResponse } from "next/server";
+import { GetObjectCommand, ListObjectsV2Command } from "@aws-sdk/client-s3";
+import s3 from "@/lib/s3Client";
 
 // --- Persistent Memory Layer with File Context Tracking ---
 type FileReference = { name: string; type: string; key: string; lastReferenced: number };
@@ -130,6 +133,10 @@ export async function POST(req: Request) {
     // Handle file-related queries
     const pdfKeys = await listPdfFilesInS3(bucketName);
     const txtKeys = await listTxtFilesInS3(bucketName);
+    // Add CSV/XLSX/XLS support
+    const csvKeys = (await s3.send(new ListObjectsV2Command({ Bucket: bucketName }))).Contents
+      ?.filter(f => /\.(csv|xlsx|xls)$/i.test(f.Key || ''))
+      .map(f => f.Key!) || [];
     let foundFile: { name: string; type: string; key: string } | null = null;
     for (const key of pdfKeys) {
       const docName = key.split('/').pop()?.replace('.pdf', '') || '';
@@ -142,6 +149,14 @@ export async function POST(req: Request) {
       const txtName = key.split('/').pop()?.replace('.txt', '') || '';
       if (normalize(resolvedMessage).includes(normalize(txtName))) {
         foundFile = { name: txtName, type: 'txt', key };
+        break;
+      }
+    }
+    // CSV/XLSX/XLS detection
+    for (const key of csvKeys) {
+      const csvName = key.split('/').pop()?.replace(/\.(csv|xlsx|xls)$/i, '') || '';
+      if (normalize(resolvedMessage).includes(normalize(csvName))) {
+        foundFile = { name: csvName, type: 'csv', key };
         break;
       }
     }
@@ -184,6 +199,25 @@ export async function POST(req: Request) {
         text = await fetchPdfTextFromS3(bucketName, foundFile.key);
       } else if (foundFile.type === 'txt') {
         text = await fetchTxtContentFromS3(bucketName, foundFile.key);
+      } else if (foundFile.type === 'csv') {
+        // Fetch file buffer from S3 (robust stream-to-buffer handling)
+        const fileBuffer = await (async function fetchFileBufferFromS3(bucket: string, key: string): Promise<Buffer> {
+          const command = new GetObjectCommand({ Bucket: bucket, Key: key });
+          const response = await s3.send(command);
+          // AWS SDK v3: response.Body can be a Readable stream (Node.js)
+          const stream = response.Body as NodeJS.ReadableStream | undefined;
+          if (!stream) throw new Error('Le flux du fichier S3 est indéfini.');
+          const chunks: Buffer[] = [];
+          for await (const chunk of stream) {
+            chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+          }
+          return Buffer.concat(chunks);
+        })(bucketName, foundFile.key);
+        const parsed = await parseStructuredFile(fileBuffer, foundFile.key);
+        if (parsed.error) {
+          return NextResponse.json({ reply: parsed.error });
+        }
+        text = parsed.summary + "\n\nExtrait des données :\n" + JSON.stringify(parsed.data.slice(0, 5), null, 2);
       }
       const userIntent = detectSummaryIntent(resolvedMessage)
         ? resolvedMessage

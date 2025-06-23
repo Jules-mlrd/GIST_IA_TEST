@@ -28,7 +28,6 @@ export async function POST(req: NextRequest) {
 
   try {
     const response = await s3.send(command)
-    // @ts-ignore
     const stream = response.Body
     const text = await streamToString(stream)
     let valid = false
