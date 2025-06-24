@@ -39,6 +39,7 @@ const navigationItems = [
   { title: "Risks", icon: AlertTriangle, href: "/risks" },
   { title: "Timeline", icon: Clock, href: "/timeline" },
   { title: "Submit a Question", icon: MessageSquare, href: "/submit-question" },
+  { title: "Dashboard IA", icon: BarChart3, href: "/ai-dashboard" },
 ]
 
 interface LayoutProps {
@@ -158,17 +159,6 @@ export function Layout({ children, title, subtitle }: LayoutProps) {
                 <div>
                   <h1 className="text-xl font-semibold text-gray-900">{title}</h1>
                   {subtitle && <p className="text-sm text-gray-500">{subtitle}</p>}
-                </div>
-              </div>
-              <div className="flex items-center gap-4">
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                  <Input
-                    placeholder="Rechercher documents, tâches..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="pl-10 w-64"
-                  />
                 </div>
               </div>
             </div>

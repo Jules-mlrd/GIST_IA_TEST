@@ -211,21 +211,6 @@ export default function ProjectSelectionPage() {
 					</p>
 				</div>
 
-				{/* Search Bar - Only show for collaborators or if there are multiple projects */}
-				{(userType !== "client" || filteredProjects.length > 1) && (
-					<div className="mb-6">
-						<div className="relative max-w-md">
-							<Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-							<Input
-								placeholder="Rechercher par nom, ID ou description..."
-								value={searchQuery}
-								onChange={(e) => setSearchQuery(e.target.value)}
-								className="pl-10"
-							/>
-						</div>
-					</div>
-				)}
-
 				{/* Projects Grid */}
 				<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
 					{filteredProjects.map((project) => (
