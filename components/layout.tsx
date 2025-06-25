@@ -33,12 +33,12 @@ import { usePathname, useRouter } from "next/navigation"
 import Link from "next/link"
 
 const navigationItems = [
+  { title: "Accueil", icon: MessageSquare, href: "/help-center" },
   { title: "Project Summary", icon: BarChart3, href: "/project-summary" },
   { title: "Documents", icon: FileText, href: "/documents" },
   { title: "Contacts", icon: Users, href: "/contacts" },
   { title: "Risks", icon: AlertTriangle, href: "/risks" },
   { title: "Timeline", icon: Clock, href: "/timeline" },
-  { title: "Submit a Question", icon: MessageSquare, href: "/submit-question" },
   { title: "Dashboard IA", icon: BarChart3, href: "/ai-dashboard" },
 ]
 

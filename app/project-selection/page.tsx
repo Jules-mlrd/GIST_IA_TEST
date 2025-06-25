@@ -129,7 +129,7 @@ export default function ProjectSelectionPage() {
 		if (project.isFullyImplemented) {
 			// Store selected project info
 			localStorage.setItem("gist-selected-project", JSON.stringify(project))
-			router.push("/project-summary")
+			router.push("/help-center")
 		} else {
 			// For placeholder projects, show a message or redirect to a placeholder page
 			alert(

@@ -6,27 +6,36 @@ import { v4 as uuidv4 } from "uuid";
 
 export async function POST(req: Request) {
   const formData = await req.formData();
-  const file = formData.get("file") as File;
+  // Supporte l'upload de plusieurs fichiers
+  const files = formData.getAll("file").filter(Boolean) as File[];
 
-  if (!file) {
-    return NextResponse.json({ error: "Fichier manquant" }, { status: 400 });
+  if (!files || files.length === 0) {
+    return NextResponse.json({ error: "Aucun fichier reçu" }, { status: 400 });
   }
 
-  const buffer = Buffer.from(await file.arrayBuffer());
-  const fileName = `${uuidv4()}-${file.name}`;
-
-  const uploadParams = {
-    Bucket: process.env.AWS_BUCKET_NAME!,
-    Key: `documents/${fileName}`,
-    Body: buffer,
-    ContentType: file.type,
-  };
-
-  try {
-    await s3.send(new PutObjectCommand(uploadParams));
-    return NextResponse.json({ message: "Upload réussi", fileName });
-  } catch (err) {
-    console.error("Erreur upload S3:", err);
-    return NextResponse.json({ error: "Échec de l'upload" }, { status: 500 });
+  const uploaded: { fileName: string, url?: string, error?: string }[] = [];
+  for (const file of files) {
+    // Optionnel : filtrer les types supportés
+    const allowedTypes = ["application/pdf", "text/plain", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "application/vnd.ms-excel", "text/csv", "application/msword", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"];
+    if (!allowedTypes.includes(file.type)) {
+      uploaded.push({ fileName: file.name, error: "Type de fichier non supporté" });
+      continue;
+    }
+    const buffer = Buffer.from(await file.arrayBuffer());
+    const fileName = `${uuidv4()}-${file.name}`;
+    const uploadParams = {
+      Bucket: process.env.AWS_BUCKET_NAME!,
+      Key: `documents/${fileName}`,
+      Body: buffer,
+      ContentType: file.type,
+    };
+    try {
+      await s3.send(new PutObjectCommand(uploadParams));
+      uploaded.push({ fileName });
+    } catch (err) {
+      console.error("Erreur upload S3:", err);
+      uploaded.push({ fileName: file.name, error: "Échec de l'upload" });
+    }
   }
+  return NextResponse.json({ uploaded });
 }

@@ -36,10 +36,10 @@ async function fetchTasks() {
   ]
 }
 async function fetchFaqs() {
-  // Simulate FAQ from /submit-question/page.tsx
+  // Simulate FAQ from /help-center/page.tsx
   return [
-    { question: "Comment puis-je suivre l'avancement du projet ?", page: "/submit-question" },
-    { question: "Comment télécharger les documents du projet ?", page: "/submit-question" },
+    { question: "Comment puis-je suivre l'avancement du projet ?", page: "/help-center" },
+    { question: "Comment télécharger les documents du projet ?", page: "/help-center" },
   ]
 }
 

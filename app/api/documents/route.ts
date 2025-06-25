@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server"
-import { ListObjectsV2Command, DeleteObjectCommand } from "@aws-sdk/client-s3"
+import { ListObjectsV2Command, DeleteObjectCommand, GetObjectCommand } from "@aws-sdk/client-s3"
 import s3, { generatePresignedUrl } from "@/lib/s3Client"
+// JSZip installé via pnpm, types inclus
+import JSZip from "jszip"
+// import type JSZip from 'jszip'; // Si besoin de typage explicite
 
 export async function GET() {
   try {
@@ -49,4 +52,44 @@ export async function DELETE(req: Request) {
     console.error("Erreur lors de la suppression du fichier S3:", error);
     return new NextResponse("Erreur lors de la suppression du fichier", { status: 500 });
   }
+}
+
+export async function POST(req: Request) {
+  const { keys } = await req.json();
+  if (!Array.isArray(keys) || keys.length === 0) {
+    return NextResponse.json({ error: "Aucune clé de fichier fournie" }, { status: 400 });
+  }
+  const zip = new JSZip();
+  for (const key of keys) {
+    try {
+      const command = new GetObjectCommand({
+        Bucket: process.env.AWS_BUCKET_NAME!,
+        Key: key,
+      });
+      const response = await s3.send(command);
+      // @ts-ignore
+      const stream = response.Body as any; // Cast explicite pour compatibilité Node/Edge
+      if (!stream || typeof stream[Symbol.asyncIterator] !== "function") {
+        zip.file(key.split("/").pop() + ".error.txt", `Erreur: flux S3 non disponible ou non itérable pour ${key}`);
+        continue;
+      }
+      const chunks: Buffer[] = [];
+      for await (const chunk of stream as any) {
+        chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+      }
+      const buffer = Buffer.concat(chunks);
+      const name = key.split("/").pop() || key;
+      zip.file(name, buffer);
+    } catch (e) {
+      zip.file(key.split("/").pop() + ".error.txt", `Erreur lors de l'export du fichier: ${(e as any).message}`);
+    }
+  }
+  const zipBuffer = await zip.generateAsync({ type: "nodebuffer" });
+  return new Response(zipBuffer, {
+    status: 200,
+    headers: {
+      "Content-Type": "application/zip",
+      "Content-Disposition": `attachment; filename=export_documents.zip`,
+    },
+  });
 }
