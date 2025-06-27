@@ -5,7 +5,6 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
-// Appelle l'API OpenAI pour obtenir l'embedding d'un texte
 export async function getEmbeddingOpenAI(text: string, apiKey?: string): Promise<number[]> {
   const response = await fetch('https://api.openai.com/v1/embeddings', {
     method: 'POST',

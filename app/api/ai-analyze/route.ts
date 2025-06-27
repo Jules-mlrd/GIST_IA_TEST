@@ -14,7 +14,7 @@ async function getS3FileBuffer(key: string): Promise<Buffer> {
     Key: key,
   })
   const response = await s3.send(command)
-  // @ts-ignore
+  
   const stream = response.Body
   if (!stream) {
     throw new Error("S3 stream non disponible pour " + key)
@@ -26,25 +26,21 @@ async function getS3FileBuffer(key: string): Promise<Buffer> {
   return Buffer.concat(chunks)
 }
 
-// Helper pour lire un fichier texte depuis S3
 async function readTxtFromS3(key: string) {
   const buffer = await getS3FileBuffer(key)
   return buffer.toString("utf-8")
 }
 
-// Helper pour lire un PDF depuis S3
 async function readPdfFromS3(key: string) {
   const buffer = await getS3FileBuffer(key)
   const data = await pdfParse(buffer)
   return data.text
 }
 
-// Helper pour lire un DOCX (placeholder)
 async function readDocxFromS3(key: string) {
   return "[Lecture DOCX non implémentée dans cette démo]"
 }
 
-// Appel à l'API OpenAI avec retry
 async function askOpenAI(prompt: string, maxRetries = 2): Promise<string> {
   const openai = new OpenAI({
     apiKey: process.env.OPENAI_API_KEY,
@@ -60,18 +56,15 @@ async function askOpenAI(prompt: string, maxRetries = 2): Promise<string> {
       return completion.choices[0].message?.content || ""
     } catch (err) {
       lastError = err
-      // Attendre avant de réessayer (exponentiel)
       if (attempt < maxRetries) {
         const delay = 500 * Math.pow(2, attempt) // 500ms, 1000ms
         await new Promise(res => setTimeout(res, delay))
       }
     }
   }
-  // Si toutes les tentatives échouent, throw la dernière erreur
   throw lastError
 }
 
-// Centralisation des prompts OpenAI
 const PROMPTS = {
   devis: (text: string) => `Voici le texte d'un devis fournisseur :\n"""\n${text}\n"""\n
 1. Liste toutes les lignes du devis (description, quantité, prix unitaire, total ligne).
@@ -96,12 +89,10 @@ Analyse ces documents et produis une synthèse avancée pour un dashboard projet
 Réponds uniquement en JSON strictement formaté, avec les clés suivantes :\n- detailedSummary (string, long résumé détaillé)\n- kpis (array d'objets {label, value})\n- alerts (array de strings)\n- people (array d'objets {name, status, contact})\n- timeline (array d'objets {date, label})\n\nN'inclus aucun texte hors du JSON.`
 }
 
-// Utilitaire pour tronquer le texte à une longueur maximale
 function truncateText(text: string, max: number = 8000) {
   return text.length > max ? text.slice(0, max) : text
 }
 
-// Mapping des extensions de fichiers vers leur handler
 const FILE_HANDLERS: Record<string, (key: string) => Promise<string | Buffer>> = {
   pdf: readPdfFromS3,
   txt: readTxtFromS3,
@@ -121,7 +112,6 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Aucune clé de fichier reçue" }, { status: 400 })
   }
 
-  // Préparation des groupes de fichiers par type
   let globalText = ""
   let devisTexts: { key: string, text: string }[] = []
   let excelFiles: { key: string, buffer: Buffer, ext: string }[] = []
@@ -167,7 +157,6 @@ export async function POST(req: Request) {
     }
   }
 
-  // Analyse des devis
   let devisAnalysis: any[] = []
   for (const devis of devisTexts) {
     try {
@@ -184,7 +173,6 @@ export async function POST(req: Request) {
     }
   }
 
-  // Analyse Excel/CSV
   let excelAnalysis: any[] = []
   for (const excel of excelFiles) {
     try {
@@ -209,7 +197,6 @@ export async function POST(req: Request) {
     }
   }
 
-  // Analyse PDF hors devis
   let pdfAnalysis: any[] = []
   for (const pdf of pdfFiles) {
     try {
@@ -226,7 +213,6 @@ export async function POST(req: Request) {
     }
   }
 
-  // Analyse TXT hors devis
   let txtAnalysis: any[] = []
   for (const txt of txtFiles) {
     try {
@@ -243,7 +229,6 @@ export async function POST(req: Request) {
     }
   }
 
-  // Synthèse globale (pour widget global)
   let globalData: any = {}
   if (globalText.trim().length > 0) {
     try {
@@ -259,7 +244,6 @@ export async function POST(req: Request) {
     }
   }
 
-  // Retourne toutes les analyses pour chaque widget
   return NextResponse.json({
     ...globalData,
     devisAnalysis,

@@ -1,10 +1,3 @@
-// lib/fuzzyMatch.ts
-// Simple fuzzy matching utility for document name detection
-
-/**
- * Returns a similarity score between two strings (0 to 1).
- * Uses a basic normalized Levenshtein distance.
- */
 export function similarity(a: string, b: string): number {
   a = a.toLowerCase();
   b = b.toLowerCase();
@@ -19,9 +12,9 @@ export function similarity(a: string, b: string): number {
     for (let j = 1; j <= b.length; j++) {
       const cost = a[i - 1] === b[j - 1] ? 0 : 1;
       matrix[i][j] = Math.min(
-        matrix[i - 1][j] + 1, // deletion
-        matrix[i][j - 1] + 1, // insertion
-        matrix[i - 1][j - 1] + cost // substitution
+        matrix[i - 1][j] + 1,
+        matrix[i][j - 1] + 1,
+        matrix[i - 1][j - 1] + cost
       );
     }
   }
@@ -29,10 +22,7 @@ export function similarity(a: string, b: string): number {
   return 1 - distance / Math.max(a.length, b.length);
 }
 
-/**
- * Finds the best fuzzy match for a query in a list of candidates.
- * Returns the best match and its score.
- */
+
 export function findBestFuzzyMatch(query: string, candidates: string[]): { match: string, score: number } {
   let best = { match: '', score: 0 };
   for (const candidate of candidates) {

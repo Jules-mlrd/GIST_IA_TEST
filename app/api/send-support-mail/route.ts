@@ -4,7 +4,6 @@ import nodemailer from "nodemailer";
 export async function POST(req: NextRequest) {
   const { email, subject, message } = await req.json();
 
-  // Utilise Mailtrap (gratuit pour test) ou configure ton SMTP
   const transporter = nodemailer.createTransport({
     host: process.env.SMTP_HOST,
     port: Number(process.env.SMTP_PORT),
@@ -17,7 +16,7 @@ export async function POST(req: NextRequest) {
   try {
     await transporter.sendMail({
       from: email,
-      to: process.env.SUPPORT_EMAIL_TO, // L'adresse de réception du support
+      to: process.env.SUPPORT_EMAIL_TO, 
       subject: `[Support GIST] ${subject}`,
       text: message,
     });

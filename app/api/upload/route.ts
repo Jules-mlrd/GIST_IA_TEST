@@ -6,7 +6,6 @@ import { v4 as uuidv4 } from "uuid";
 
 export async function POST(req: Request) {
   const formData = await req.formData();
-  // Supporte l'upload de plusieurs fichiers
   const files = formData.getAll("file").filter(Boolean) as File[];
 
   if (!files || files.length === 0) {
@@ -15,7 +14,6 @@ export async function POST(req: Request) {
 
   const uploaded: { fileName: string, url?: string, error?: string }[] = [];
   for (const file of files) {
-    // Optionnel : filtrer les types supportés
     const allowedTypes = ["application/pdf", "text/plain", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "application/vnd.ms-excel", "text/csv", "application/msword", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"];
     if (!allowedTypes.includes(file.type)) {
       uploaded.push({ fileName: file.name, error: "Type de fichier non supporté" });

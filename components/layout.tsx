@@ -48,6 +48,26 @@ interface LayoutProps {
   subtitle?: string
 }
 
+// Composant sécurisé pour afficher le rôle utilisateur
+function SidebarUserRole() {
+  const [userType, setUserType] = useState<string | null>(null)
+
+  useEffect(() => {
+    setUserType(localStorage.getItem("gist-user-type"))
+  }, [])
+
+  if (userType === null) {
+    // Placeholder pour éviter l'hydration mismatch
+    return <div className="px-2 py-1 text-xs text-gray-400">&nbsp;</div>
+  }
+
+  return (
+    <div className="px-2 py-1 text-xs text-gray-500">
+      {userType === "collaborator" ? "admin" : "Utilisateur"}
+    </div>
+  )
+}
+
 export function Layout({ children, title, subtitle }: LayoutProps) {
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedProject, setSelectedProject] = useState<any>(null)
@@ -137,7 +157,7 @@ export function Layout({ children, title, subtitle }: LayoutProps) {
               <SidebarGroupContent>
                 <SidebarMenu>
                   <SidebarMenuItem>
-                    <div className="px-2 py-1 text-xs text-gray-500">Connecté en tant que: {userName}</div>
+                    <SidebarUserRole />
                   </SidebarMenuItem>
                   <SidebarMenuItem>
                     <SidebarMenuButton onClick={handleLogout} className="text-red-600 hover:bg-red-50">

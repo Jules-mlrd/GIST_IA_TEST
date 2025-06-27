@@ -129,13 +129,13 @@ export default function HelpCenterPage() {
 
   return (
     <Layout title="Centre d'aide & Découverte" subtitle="Comprenez et exploitez toutes les fonctionnalités de l'application">
-      <div className="w-full min-h-[80vh] flex flex-col items-center justify-start bg-gradient-to-b from-blue-50/60 to-white py-8 px-2">
+      <div className="w-full min-h-[80vh] flex flex-col items-center justify-start bg-sidebar py-8 px-2" style={{ backgroundColor: "hsl(var(--sidebar-background))" }}>
         {/* Bannière d'accueil */}
         <div className="max-w-3xl w-full text-center mb-10">
           <div className="flex justify-center mb-4">
             <LifeBuoy className="h-14 w-14 text-blue-400" />
           </div>
-          <h1 className="text-4xl md:text-5xl font-extrabold text-blue-700 mb-2">Bienvenue sur GIST Connect !</h1>
+          <h1 className="text-4xl md:text-5xl font-extrabold text-gist-blue mb-2">Bienvenue sur GIST Connect !</h1>
           <p className="text-lg md:text-xl text-gray-700">Votre assistant IA pour la gestion de projet SNCF. Découvrez comment tirer le meilleur parti de la plateforme.</p>
         </div>
 
@@ -146,7 +146,7 @@ export default function HelpCenterPage() {
               <div className="mb-3">{section.icon}</div>
               <CardTitle className="text-xl font-bold text-center mb-2">{section.title}</CardTitle>
               <CardContent className="text-gray-600 text-center mb-4 p-0">{section.description}</CardContent>
-              <Button asChild className="mt-auto bg-blue-600 hover:bg-blue-700 text-white font-semibold px-6 py-2 rounded-lg">
+              <Button asChild className="mt-auto bg-gist-blue hover:bg-gist-blue/90 text-white font-semibold px-6 py-2 rounded-lg">
                 <a href={section.link}>{section.cta}</a>
               </Button>
             </Card>
@@ -190,7 +190,7 @@ export default function HelpCenterPage() {
                   {success && <div className="text-green-600 font-semibold">Votre demande a bien été envoyée !</div>}
                   {error && <div className="text-red-600 font-semibold">{error}</div>}
                   <div className="flex justify-end">
-                    <Button type="submit" className="bg-sncf-red hover:bg-red-700 px-10 py-3 text-lg rounded-md" disabled={loading}>{loading ? "Envoi..." : "Envoyer"}</Button>
+                    <Button type="submit" className="bg-gist-blue hover:bg-gist-blue/90 text-white px-10 py-3 text-lg rounded-md" disabled={loading}>{loading ? "Envoi..." : "Envoyer"}</Button>
                   </div>
                 </form>
               </div>

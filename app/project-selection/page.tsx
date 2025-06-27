@@ -127,11 +127,9 @@ export default function ProjectSelectionPage() {
 
 	const handleProjectSelect = (project: (typeof allProjects)[0]) => {
 		if (project.isFullyImplemented) {
-			// Store selected project info
 			localStorage.setItem("gist-selected-project", JSON.stringify(project))
 			router.push("/help-center")
 		} else {
-			// For placeholder projects, show a message or redirect to a placeholder page
 			alert(
 				`Le projet "${project.name}" est en cours de configuration. Seul le projet "Lyon–Paris high-speed line" est actuellement disponible.`,
 			)

@@ -22,7 +22,7 @@ type Message = {
 type UploadedFile = {
   file: File;
   status: 'pending' | 'uploading' | 'uploaded' | 'error';
-  s3Key?: string; // S3 file reference
+  s3Key?: string;
   error?: string;
 };
 
@@ -57,12 +57,10 @@ export function ChatBot() {
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([])
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  // Scroll to bottom when messages change
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
   }, [messages])
 
-  // Upload a single file to /api/upload
   const uploadFileToS3 = async (file: File, index: number) => {
     setUploadedFiles((prev) => prev.map((uf, i) => i === index ? { ...uf, status: 'uploading' } : uf));
     const formData = new FormData();
@@ -83,7 +81,6 @@ export function ChatBot() {
     }
   };
 
-  // Handle file selection and trigger upload
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (files && files.length > 0) {
@@ -91,15 +88,13 @@ export function ChatBot() {
       setUploadedFiles((prev) => {
         const startIdx = prev.length;
         const allFiles = [...prev, ...newFiles];
-        // Start upload for each new file
         newFiles.forEach((uf, i) => uploadFileToS3(uf.file, startIdx + i));
         return allFiles;
       });
     }
-    e.target.value = '' // reset input
+    e.target.value = ''
   }
 
-  // Remove a file from the list
   const handleRemoveFile = (index: number) => {
     setUploadedFiles((prev) => prev.filter((_, i) => i !== index));
   }
@@ -121,8 +116,6 @@ export function ChatBot() {
 
     try {
       console.log('Envoi du message:', currentMessage)
-      
-      // Appel à votre API route
       const uploadedS3Keys = uploadedFiles.filter(f => f.status === 'uploaded' && f.s3Key).map(f => f.s3Key);
       const response = await fetch('/api/chat', {
         method: 'POST',
@@ -231,7 +224,6 @@ export function ChatBot() {
                       )}
                       <p className="text-sm whitespace-pre-wrap flex items-center gap-2">
                         {message.content}
-                        {/* Bouton d'explicabilité à côté de chaque réponse IA */}
                         {message.sender === "bot" && explicabilityMap[message.id] && (
                           <Popover open={openExplicabilityId === message.id} onOpenChange={open => setOpenExplicabilityId(open ? message.id : null)}>
                             <PopoverTrigger asChild>
@@ -292,7 +284,6 @@ export function ChatBot() {
               </div>
             </ScrollArea>
             <div className="p-4 border-t">
-              {/* File upload UI */}
               <div className="mb-2">
                 <input
                   type="file"
@@ -333,7 +324,6 @@ export function ChatBot() {
                   </div>
                 )}
               </div>
-              {/* Suggestion de question similaire */}
               {similarPast && similarPast.question && (
                 <div className="mb-2 p-2 bg-yellow-50 border border-yellow-300 rounded text-xs text-yellow-900">
                   <div className="font-semibold mb-1">Question similaire déjà posée :</div>

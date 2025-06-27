@@ -19,7 +19,6 @@ export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(false)
   const router = useRouter()
 
-  // Helper to validate credentials via API route
   async function validateCredentials(username: string, password: string) {
     const res = await fetch("/api/auth/validate-user", {
       method: "POST",
@@ -34,7 +33,6 @@ export default function LoginPage() {
     e.preventDefault()
     setIsLoading(true)
 
-    // Validate credentials from S3
     const isValid = await validateCredentials(clientUsername, clientPassword)
     if (!isValid) {
       setIsLoading(false)
@@ -42,12 +40,10 @@ export default function LoginPage() {
       return
     }
 
-    // Store authentication state for client
     localStorage.setItem("gist-authenticated", "true")
     localStorage.setItem("gist-user", clientUsername || "Client")
     localStorage.setItem("gist-user-type", "client")
 
-    // For clients, set the specific project and redirect directly to project summary
     const clientProject = {
       id: "GIST-2024-001",
       name: "Ligne à grande vitesse Lyon–Paris",
@@ -69,7 +65,6 @@ export default function LoginPage() {
     e.preventDefault()
     setIsLoading(true)
 
-    // Validate credentials from S3
     const isValid = await validateCredentials(collaboratorUsername, collaboratorPassword)
     if (!isValid) {
       setIsLoading(false)
@@ -77,12 +72,10 @@ export default function LoginPage() {
       return
     }
 
-    // Store authentication state for collaborator
     localStorage.setItem("gist-authenticated", "true")
     localStorage.setItem("gist-user", collaboratorUsername || "Collaborateur")
     localStorage.setItem("gist-user-type", "collaborator")
 
-    // Collaborators go to project selection to see all projects
     router.push("/project-selection")
   }
 

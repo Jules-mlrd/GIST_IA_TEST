@@ -6,12 +6,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Loader2, Download, BarChart3, FileText, HelpCircle, RefreshCw } from "lucide-react"
-import { Chart as ChartJS, BarElement, CategoryScale, LinearScale, Tooltip, Legend, ChartData } from "chart.js"
-import { Bar } from "react-chartjs-2"
+import { Chart as ChartJS, BarElement, CategoryScale, LinearScale, Tooltip, Legend, ChartData, PointElement, LineElement, ArcElement } from "chart.js"
+import { Bar, Line, Pie } from "react-chartjs-2"
 import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from "@/components/ui/select"
 import { X, Plus } from "lucide-react"
 
-ChartJS.register(BarElement, CategoryScale, LinearScale, Tooltip, Legend)
+ChartJS.register(BarElement, CategoryScale, LinearScale, Tooltip, Legend, PointElement, LineElement, ArcElement)
 
 interface S3Document {
   name: string
@@ -104,6 +104,70 @@ function useWidgetState(initialWidgets: { id: number, type: string }[] = []) {
   }
 }
 
+// Composant utilitaire pour un graphique avec export PNG
+function ChartWithExport({ chartType, chartData, chartOptions, title, explanation, axes, children }: {
+  chartType: 'bar' | 'line' | 'pie',
+  chartData: any,
+  chartOptions: any,
+  title: string,
+  explanation?: string,
+  axes?: string,
+  children?: React.ReactNode
+}) {
+  const chartRef = useRef<any>(null);
+  const handleExportPNG = () => {
+    if (chartRef.current) {
+      const url = chartRef.current.toBase64Image();
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${title || 'graphique'}.png`;
+      a.click();
+    }
+  };
+  let ChartComponent = null;
+  if (chartType === 'bar') ChartComponent = <Bar ref={chartRef} data={chartData} options={chartOptions} />;
+  else if (chartType === 'line') ChartComponent = <Line ref={chartRef} data={chartData} options={chartOptions} />;
+  else if (chartType === 'pie') {
+    // Robustesse Pie chart
+    const labels = Array.isArray(chartData.labels) ? chartData.labels.filter((l: string) => l !== null && l !== undefined && l !== "") : [];
+    const dataArr = Array.isArray(chartData.datasets?.[0]?.data) ? chartData.datasets[0].data.map((v: number) => (typeof v === 'number' && !isNaN(v) ? v : 0)) : [];
+    // Debug affichage
+    const debug = true;
+    if (debug) {
+      ChartComponent = <div className="mb-2 text-xs text-gray-500">Labels: {JSON.stringify(labels)}<br/>Data: {JSON.stringify(dataArr)}</div>;
+    }
+    if (labels.length === 0 || dataArr.length === 0 || dataArr.every((v: number) => v === 0)) {
+      ChartComponent = <div className="text-yellow-700 font-semibold">Impossible d'afficher le camembert : données vides ou non valides.</div>;
+    } else if (labels.length === 1) {
+      ChartComponent = <div className="text-yellow-700 font-semibold">Impossible d'afficher un camembert avec une seule valeur.</div>;
+    } else {
+      ChartComponent = <Pie ref={chartRef} data={{
+        ...chartData,
+        labels,
+        datasets: [{ ...chartData.datasets[0], data: dataArr }],
+      }} options={chartOptions} />;
+    }
+  }
+  return (
+    <div className="mb-4 p-3 bg-white border border-green-100 rounded-lg shadow-sm">
+      <div className="font-semibold text-green-800 mb-1 flex items-center gap-2">
+        <BarChart3 className="h-4 w-4 text-green-400" /> {title}
+      </div>
+      {ChartComponent}
+      <div className="flex gap-2 mt-2">
+        <Button size="sm" variant="outline" onClick={handleExportPNG}>
+          <Download className="h-4 w-4 mr-1" /> Exporter en PNG
+        </Button>
+        {children}
+      </div>
+      {explanation && (
+        <div className="text-xs text-gray-700 mt-2 italic">{explanation}</div>
+      )}
+      {axes && <div className="text-xs text-gray-500 mt-1">{axes}</div>}
+    </div>
+  );
+}
+
 // Sous-composant pour un widget d'analyse
 function WidgetCard({
   widget,
@@ -138,6 +202,97 @@ function WidgetCard({
   onDownloadSummary: (id: number) => void,
   getChartData: (res: any) => ChartData<'bar', any, unknown> | undefined
 }) {
+  // Pour Excel : mémoriser l'index du graphique sélectionné pour chaque item (fichier)
+  const [selectedChartIdxs, setSelectedChartIdxs] = useState<Record<number, number>>({});
+
+  let chartComponent = null;
+  let labels: string[] = [];
+  let values: number[] = [];
+  let pieLabels: string[] = [];
+  let pieData: number[] = [];
+  if (res && res.data && res.data.length > 0) {
+    labels = res.data.slice(0, 20).map((row: any) => row[res.data[0][0]]);
+    values = res.data.slice(0, 20).map((row: any) => parseFloat(row[res.data[0][1]]) || 0);
+    if (res.type.toLowerCase() === "pie" || res.type.toLowerCase() === "camembert") {
+      const group: Record<string, number> = {};
+      res.data.slice(0, 100).forEach((row: any) => {
+        const key = row[res.data[0][0]];
+        const val = parseFloat(row[res.data[0][1]]) || 1;
+        group[key] = (group[key] || 0) + val;
+      });
+      pieLabels = Object.keys(group);
+      pieData = Object.values(group);
+    }
+    if (res.type.toLowerCase() === "bar" || res.type.toLowerCase() === "column" || res.type.toLowerCase() === "histogram") {
+      chartComponent = (
+        <ChartWithExport
+          chartType="bar"
+          chartData={{
+            labels,
+            datasets: [
+              {
+                label: res.data[0][1],
+                data: values,
+                backgroundColor: '#22c55e',
+              },
+            ],
+          }}
+          chartOptions={{ responsive: true, plugins: { legend: { display: false } } }}
+          title={`${res.title} (${res.type})`}
+          explanation={res.explanation}
+          axes={`Axe X : ${res.data[0][0]} | Axe Y : ${res.data[0][1]}`}
+        />
+      );
+    } else if (res.type.toLowerCase() === "line" || res.type.toLowerCase() === "courbe") {
+      chartComponent = (
+        <ChartWithExport
+          chartType="line"
+          chartData={{
+            labels,
+            datasets: [
+              {
+                label: res.data[0][1],
+                data: values,
+                borderColor: '#22c55e',
+                backgroundColor: 'rgba(34,197,94,0.2)'
+              },
+            ],
+          }}
+          chartOptions={{ responsive: true, plugins: { legend: { display: false } } }}
+          title={`${res.title} (${res.type})`}
+          explanation={res.explanation}
+          axes={`Axe X : ${res.data[0][0]} | Axe Y : ${res.data[0][1]}`}
+        />
+      );
+    } else if (res.type.toLowerCase() === "pie" || res.type.toLowerCase() === "camembert") {
+      chartComponent = (
+        <ChartWithExport
+          chartType="pie"
+          chartData={{
+            labels: pieLabels,
+            datasets: [
+              {
+                label: res.data[0][1],
+                data: pieData,
+                backgroundColor: [
+                  '#22c55e', '#a3e635', '#fde047', '#fbbf24', '#f87171', '#60a5fa', '#c084fc', '#f472b6', '#facc15', '#34d399', '#818cf8', '#f472b6', '#fbbf24', '#f87171', '#60a5fa', '#c084fc', '#f472b6', '#facc15', '#34d399', '#818cf8'
+                ],
+              },
+            ],
+          }}
+          chartOptions={{ responsive: true, plugins: { legend: { display: true, position: 'bottom' } } }}
+          title={`${res.title} (${res.type})`}
+          explanation={res.explanation}
+          axes={`Axe X : ${res.data[0][0]} | Axe Y : ${res.data[0][1]}`}
+        />
+      );
+    } else {
+      chartComponent = (
+        <div className="text-yellow-700 flex items-center gap-2"><FileText className="h-4 w-4" /> Type de graphique non supporté : {res.type}</div>
+      );
+    }
+  }
+
   return (
     <Card className={`bg-white/90 shadow-md rounded-xl border border-gray-100 transition p-0 flex flex-col min-h-[420px] w-full`}>
       <CardHeader className="flex flex-row items-center gap-3 pb-1 px-6 pt-6">
@@ -243,7 +398,219 @@ function WidgetCard({
             )}
           </div>
         )}
-        {/* TODO: Ajouter le rendu pour les autres types de widgets (devis, excel, pdf, txt) ici */}
+        {/* Rendu pour les autres types de widgets */}
+        {widget.type === "excel" && res && (
+          <div className="mt-6 space-y-6">
+            <h3 className="text-green-900 font-bold text-lg mb-2 flex items-center gap-2">
+              <BarChart3 className="h-5 w-5 text-green-600" /> Analyse Excel/CSV
+            </h3>
+            {Array.isArray(res) && res.length > 0 ? (
+              res.map((item: any, idx: number) => {
+                const charts = item.charts || [];
+                const selectedChartIdx = selectedChartIdxs[idx] || 0;
+                const selectedChart = charts[selectedChartIdx];
+                // Préparation des données pour chaque type de graphique
+                let chartComponent = null;
+                let labels: string[] = [];
+                let values: number[] = [];
+                let pieLabels: string[] = [];
+                let pieData: number[] = [];
+                if (selectedChart) {
+                  labels = item.data.slice(0, 20).map((row: any) => row[selectedChart.x]);
+                  values = item.data.slice(0, 20).map((row: any) => parseFloat(row[selectedChart.y]) || 0);
+                  if (["pie", "camembert"].includes(selectedChart.type.toLowerCase())) {
+                    const group: Record<string, number> = {};
+                    item.data.slice(0, 100).forEach((row: any) => {
+                      const key = row[selectedChart.x];
+                      const val = parseFloat(row[selectedChart.y]) || 1;
+                      group[key] = (group[key] || 0) + val;
+                    });
+                    pieLabels = Object.keys(group);
+                    pieData = Object.values(group);
+                  }
+                  if (["bar", "column", "histogram", "bar chart"].includes(selectedChart.type.toLowerCase())) {
+                    chartComponent = (
+                      <ChartWithExport
+                        chartType="bar"
+                        chartData={{
+                          labels,
+                          datasets: [
+                            {
+                              label: selectedChart.y,
+                              data: values,
+                              backgroundColor: '#22c55e',
+                            },
+                          ],
+                        }}
+                        chartOptions={{ responsive: true, plugins: { legend: { display: false } } }}
+                        title={`${selectedChart.title} (${selectedChart.type})`}
+                        explanation={selectedChart.explanation}
+                        axes={`Axe X : ${selectedChart.x} | Axe Y : ${selectedChart.y}`}
+                      />
+                    );
+                  } else if (["line", "courbe", "line chart"].includes(selectedChart.type.toLowerCase())) {
+                    chartComponent = (
+                      <ChartWithExport
+                        chartType="line"
+                        chartData={{
+                          labels,
+                          datasets: [
+                            {
+                              label: selectedChart.y,
+                              data: values,
+                              borderColor: '#22c55e',
+                              backgroundColor: 'rgba(34,197,94,0.2)'
+                            },
+                          ],
+                        }}
+                        chartOptions={{ responsive: true, plugins: { legend: { display: false } } }}
+                        title={`${selectedChart.title} (${selectedChart.type})`}
+                        explanation={selectedChart.explanation}
+                        axes={`Axe X : ${selectedChart.x} | Axe Y : ${selectedChart.y}`}
+                      />
+                    );
+                  } else if (["pie", "camembert", "pie chart"].includes(selectedChart.type.toLowerCase())) {
+                    chartComponent = (
+                      <ChartWithExport
+                        chartType="pie"
+                        chartData={{
+                          labels: pieLabels,
+                          datasets: [
+                            {
+                              label: selectedChart.y,
+                              data: pieData,
+                              backgroundColor: [
+                                '#22c55e', '#a3e635', '#fde047', '#fbbf24', '#f87171', '#60a5fa', '#c084fc', '#f472b6', '#facc15', '#34d399', '#818cf8', '#f472b6', '#fbbf24', '#f87171', '#60a5fa', '#c084fc', '#f472b6', '#facc15', '#34d399', '#818cf8'
+                              ],
+                            },
+                          ],
+                        }}
+                        chartOptions={{ responsive: true, plugins: { legend: { display: true, position: 'bottom' } } }}
+                        title={`${selectedChart.title} (${selectedChart.type})`}
+                        explanation={selectedChart.explanation}
+                        axes={`Axe X : ${selectedChart.x} | Axe Y : ${selectedChart.y}`}
+                      />
+                    );
+                  } else {
+                    chartComponent = (
+                      <div className="text-yellow-700 flex items-center gap-2"><FileText className="h-4 w-4" /> Type de graphique non supporté : {selectedChart.type}</div>
+                    );
+                  }
+                }
+                return (
+                  <section key={item.key || idx} className="bg-green-50 border border-green-200 rounded-lg p-4 shadow-sm mb-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <FileText className="h-4 w-4 text-green-400" />
+                      <span className="font-semibold text-green-900 text-base">{item.key ? item.key.split("/").pop() : `Fichier ${idx+1}`}</span>
+                    </div>
+                    {item.error ? (
+                      <div className="text-red-600 font-semibold">{item.error} {item.details && <span className="text-xs text-gray-500">({item.details})</span>}</div>
+                    ) : (
+                      <>
+                        {item.summary && <div className="mb-2 text-green-900"><span className="font-semibold">Résumé :</span> {item.summary}</div>}
+                        {item.keypoints && item.keypoints.length > 0 && (
+                          <div className="mb-2">
+                            <span className="font-semibold text-green-900">Points clés :</span>
+                            <ul className="list-disc pl-6 text-green-800 text-sm">
+                              {item.keypoints.map((kp: string, i: number) => <li key={i}>{kp}</li>)}
+                            </ul>
+                          </div>
+                        )}
+                        {item.data && Array.isArray(item.data) && item.data.length > 0 && (
+                          <div className="mb-2 overflow-x-auto">
+                            <span className="font-semibold text-green-900">Aperçu du tableau :</span>
+                            <table className="min-w-full border mt-1 text-xs">
+                              <thead>
+                                <tr>
+                                  {Object.keys(item.data[0]).map((col, i) => <th key={i} className="border px-2 py-1 bg-green-100 text-green-900">{col}</th>)}
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {item.data.slice(0, 5).map((row: any, i: number) => (
+                                  <tr key={i}>
+                                    {Object.values(row).map((val, j) => <td key={j} className="border px-2 py-1">{val !== null && val !== undefined ? val.toString() : ""}</td>)}
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        )}
+                        {/* Choix du graphique à afficher */}
+                        {charts.length > 0 && (
+                          <div className="mb-4">
+                            <div className="flex flex-wrap gap-2 mb-2">
+                              {charts.map((c: any, i: number) => (
+                                <button
+                                  key={i}
+                                  className={`px-3 py-1 rounded border text-sm font-medium transition ${selectedChartIdx === i ? 'bg-green-600 text-white border-green-700' : 'bg-white text-green-900 border-green-200 hover:bg-green-100'}`}
+                                  onClick={() => setSelectedChartIdxs(s => ({ ...s, [idx]: i }))}
+                                  type="button"
+                                >
+                                  {c.title || `Graphique ${i+1}`}
+                                </button>
+                              ))}
+                            </div>
+                            {chartComponent}
+                          </div>
+                        )}
+                      </>
+                    )}
+                  </section>
+                );
+              })
+            ) : (
+              <div className="text-gray-500">Aucun résultat d'analyse.</div>
+            )}
+          </div>
+        )}
+        {widget.type === "pdf" && res && (
+          <div className="mt-6 space-y-4">
+            <h3 className="text-purple-900 font-bold text-lg mb-2 flex items-center gap-2">
+              <FileText className="h-5 w-5 text-purple-600" /> Analyse PDF
+            </h3>
+            {Array.isArray(res) && res.length > 0 ? (
+              <ul className="list-disc pl-6 text-purple-800">
+                {res.map((item: any, idx: number) => (
+                  <li key={idx}>{typeof item === "string" ? item : JSON.stringify(item)}</li>
+                ))}
+              </ul>
+            ) : (
+              <div className="text-gray-500">Aucun résultat d'analyse.</div>
+            )}
+          </div>
+        )}
+        {widget.type === "txt" && res && (
+          <div className="mt-6 space-y-4">
+            <h3 className="text-yellow-900 font-bold text-lg mb-2 flex items-center gap-2">
+              <FileText className="h-5 w-5 text-yellow-600" /> Analyse TXT
+            </h3>
+            {Array.isArray(res) && res.length > 0 ? (
+              <ul className="list-disc pl-6 text-yellow-800">
+                {res.map((item: any, idx: number) => (
+                  <li key={idx}>{typeof item === "string" ? item : JSON.stringify(item)}</li>
+                ))}
+              </ul>
+            ) : (
+              <div className="text-gray-500">Aucun résultat d'analyse.</div>
+            )}
+          </div>
+        )}
+        {widget.type === "devis" && res && (
+          <div className="mt-6 space-y-4">
+            <h3 className="text-pink-900 font-bold text-lg mb-2 flex items-center gap-2">
+              <FileText className="h-5 w-5 text-pink-600" /> Analyse Devis
+            </h3>
+            {Array.isArray(res) && res.length > 0 ? (
+              <ul className="list-disc pl-6 text-pink-800">
+                {res.map((item: any, idx: number) => (
+                  <li key={idx}>{typeof item === "string" ? item : JSON.stringify(item)}</li>
+                ))}
+              </ul>
+            ) : (
+              <div className="text-gray-500">Aucun résultat d'analyse.</div>
+            )}
+          </div>
+        )}
       </CardContent>
     </Card>
   )
