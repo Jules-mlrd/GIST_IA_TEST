@@ -32,7 +32,31 @@ export async function parseStructuredFile(
       const workbook = XLSX.read(fileBuffer, { type: "buffer" });
       const sheetName = workbook.SheetNames[0];
       const worksheet = workbook.Sheets[sheetName];
-      const jsonData = XLSX.utils.sheet_to_json(worksheet, { defval: null });
+      // Détection automatique de la zone utile (ignorer lignes/colonnes vides)
+      const range = XLSX.utils.decode_range(worksheet['!ref'] || 'A1');
+      let minRow = range.s.r, maxRow = range.e.r, minCol = range.s.c, maxCol = range.e.c;
+      // Chercher la première ligne non vide
+      outer: for (let r = range.s.r; r <= range.e.r; r++) {
+        for (let c = range.s.c; c <= range.e.c; c++) {
+          const cell = worksheet[XLSX.utils.encode_cell({ r, c })];
+          if (cell && cell.v !== undefined && cell.v !== null && cell.v !== "") {
+            minRow = r; minCol = c; break outer;
+          }
+        }
+      }
+      // Chercher la dernière ligne/colonne non vide
+      for (let r = range.e.r; r >= minRow; r--) {
+        for (let c = range.e.c; c >= minCol; c--) {
+          const cell = worksheet[XLSX.utils.encode_cell({ r, c })];
+          if (cell && cell.v !== undefined && cell.v !== null && cell.v !== "") {
+            maxRow = r; maxCol = c; break;
+          }
+        }
+        if (maxRow !== range.e.r) break;
+      }
+      // Redéfinir la zone utile
+      const usefulRange = XLSX.utils.encode_range({ s: { r: minRow, c: minCol }, e: { r: maxRow, c: maxCol } });
+      const jsonData = XLSX.utils.sheet_to_json(worksheet, { defval: null, range: usefulRange });
       return {
         data: jsonData,
         summary: summarizeTable(jsonData),

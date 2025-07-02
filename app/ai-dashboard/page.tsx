@@ -1,5 +1,6 @@
 "use client"
 
+import React from "react"
 import { useState, useEffect, useRef } from "react"
 import { Layout } from "@/components/layout"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -204,6 +205,31 @@ function WidgetCard({
 }) {
   // Pour Excel : mémoriser l'index du graphique sélectionné pour chaque item (fichier)
   const [selectedChartIdxs, setSelectedChartIdxs] = useState<Record<number, number>>({});
+  const [customChartQueries, setCustomChartQueries] = useState<Record<number, string>>({});
+  const [customChartLoading, setCustomChartLoading] = useState<Record<number, boolean>>({});
+  const [customChartResults, setCustomChartResults] = useState<Record<number, any>>({});
+  const [customChartErrors, setCustomChartErrors] = useState<Record<number, string | null>>({});
+  const [analysisDone, setAnalysisDone] = useState(false);
+  const [showManualChart, setShowManualChart] = useState(false);
+  const [manualX, setManualX] = useState<string>('');
+  const [manualY, setManualY] = useState<string>('');
+  const [manualType, setManualType] = useState<'bar'|'line'|'pie'>('bar');
+  const [manualTitle, setManualTitle] = useState<string>('');
+  const [manualPhrase, setManualPhrase] = useState('');
+  const favKey = `excelManualFavorites_${widget.id}`;
+  const [manualFavorites, setManualFavorites] = useState<any[]>(() => {
+    try {
+      return JSON.parse(localStorage.getItem(favKey) || '[]');
+    } catch { return []; }
+  });
+
+  useEffect(() => {
+    if (res && !analysisDone) setAnalysisDone(true);
+  }, [res]);
+
+  useEffect(() => {
+    localStorage.setItem(favKey, JSON.stringify(manualFavorites));
+  }, [manualFavorites, favKey]);
 
   let chartComponent = null;
   let labels: string[] = [];
@@ -293,48 +319,67 @@ function WidgetCard({
     }
   }
 
+  let devisRes: any[] | { error: string } | null = null;
+  if (widget.type === "devis") {
+    if (Array.isArray(res)) devisRes = res as any[];
+    else if (res && typeof res === 'object' && 'error' in res) devisRes = res as { error: string };
+    else devisRes = null;
+  }
+
   return (
     <Card className={`bg-white/90 shadow-md rounded-xl border border-gray-100 transition p-0 flex flex-col min-h-[420px] w-full`}>
       <CardHeader className="flex flex-row items-center gap-3 pb-1 px-6 pt-6">
         {icon}
-        <CardTitle className={`text-lg font-bold text-${color}-800`}>{label}</CardTitle>
+        <CardTitle className={`text-lg font-bold text-${color}-800`}>{label}
+          {sel.length > 0 && (
+            <span className="ml-2 text-xs font-normal text-gray-500">
+              {sel.length === 1 && docs.find(d => d.key === sel[0])?.name}
+              {sel.length === 2 && docs.filter(d => sel.includes(d.key)).map(d => d.name).join(', ')}
+              {sel.length > 2 && `${docs.filter(d => sel.includes(d.key)).slice(0,2).map(d => d.name).join(', ')} (+${sel.length-2})`}
+            </span>
+          )}
+        </CardTitle>
         <Button size="icon" variant="ghost" className="ml-auto" onClick={() => onRemove(widget.id)}><X className="h-5 w-5" /></Button>
       </CardHeader>
       <CardContent className="px-6 pb-6 pt-1 flex-1 flex flex-col">
-        <div className="mb-3 text-base text-gray-700 font-medium flex items-center justify-between">
-          <span>Fichiers à analyser :</span>
-          <Button variant="ghost" size="sm" className="flex items-center gap-1 text-sm" onClick={() => onSelectAll(widget.id, docs)}>
-            {sel.length === docs.length ? 'Tout désélectionner' : 'Tout sélectionner'}
-          </Button>
-        </div>
-        <div className={`max-h-40 overflow-y-auto rounded border bg-${color}-50/40 p-2 mb-5`}>
-          {docs.length === 0 && <div className="text-gray-400 text-sm">Aucun fichier détecté.</div>}
-          {docs.map((doc) => (
-            <label key={doc.key} className={`flex items-center gap-3 py-2 px-4 rounded cursor-pointer transition hover:bg-${color}-100 ${sel.includes(doc.key) ? `bg-${color}-200/60` : ''} text-base`}>
-              <input
-                type="checkbox"
-                checked={sel.includes(doc.key)}
-                onChange={() => onSelect(widget.id, doc.key)}
-                className={`accent-${color}-600 w-5 h-5`}
-              />
-              <span className="font-medium text-gray-900 text-sm">{doc.name}</span>
-              <Badge variant="outline" className={`ml-2 text-xs border-${color}-200 text-${color}-700 bg-${color}-50`}>{doc.type.toUpperCase()}</Badge>
-              <span className="text-xs text-gray-500">{doc.size}</span>
-            </label>
-          ))}
-        </div>
-        {sel.length > 0 && (
-          <Button onClick={() => onAnalyze(widget.id, widget.type)} disabled={isLoading} className="w-full h-10 text-base font-semibold flex items-center justify-center">
-            {isLoading ? <Loader2 className="animate-spin h-5 w-5 mr-2" /> : null}
-            {isLoading ? <span>Analyse en cours...</span> : 'Analyser'}
-          </Button>
+        {!analysisDone && (
+          <>
+            <div className="mb-3 text-base text-gray-700 font-medium flex items-center justify-between">
+              <span>Fichiers à analyser :</span>
+              <Button variant="ghost" size="sm" className="flex items-center gap-1 text-sm" onClick={() => onSelectAll(widget.id, docs)}>
+                {sel.length === docs.length ? 'Tout désélectionner' : 'Tout sélectionner'}
+              </Button>
+            </div>
+            <div className={`max-h-40 overflow-y-auto rounded border bg-${color}-50/40 p-2 mb-5`}>
+              {docs.length === 0 && <div className="text-gray-400 text-sm">Aucun fichier détecté.</div>}
+              {docs.map((doc) => (
+                <label key={doc.key} className={`flex items-center gap-3 py-2 px-4 rounded cursor-pointer transition hover:bg-${color}-100 ${sel.includes(doc.key) ? `bg-${color}-200/60` : ''} text-base`}>
+                  <input
+                    type="checkbox"
+                    checked={sel.includes(doc.key)}
+                    onChange={() => onSelect(widget.id, doc.key)}
+                    className={`accent-${color}-600 w-5 h-5`}
+                  />
+                  <span className="font-medium text-gray-900 text-sm">{doc.name}</span>
+                  <Badge variant="outline" className={`ml-2 text-xs border-${color}-200 text-${color}-700 bg-${color}-50`}>{doc.type.toUpperCase()}</Badge>
+                  <span className="text-xs text-gray-500">{doc.size}</span>
+                </label>
+              ))}
+            </div>
+            {sel.length > 0 && (
+              <Button onClick={() => onAnalyze(widget.id, widget.type)} disabled={isLoading || analysisDone} className="w-full h-10 text-base font-semibold flex items-center justify-center">
+                {isLoading ? <Loader2 className="animate-spin h-5 w-5 mr-2" /> : null}
+                {isLoading ? <span>Analyse en cours...</span> : 'Analyser'}
+              </Button>
+            )}
+            {isLoading && (
+              <div className="w-full h-1.5 bg-gray-200 rounded mt-3 overflow-hidden">
+                <div className={`h-1.5 bg-${color}-500 animate-pulse transition-all`} style={{ width: '100%' }} />
+              </div>
+            )}
+            {error && <div className="text-red-600 mt-3 text-base font-semibold">{error}</div>}
+          </>
         )}
-        {isLoading && (
-          <div className="w-full h-1.5 bg-gray-200 rounded mt-3 overflow-hidden">
-            <div className={`h-1.5 bg-${color}-500 animate-pulse transition-all`} style={{ width: '100%' }} />
-          </div>
-        )}
-        {error && <div className="text-red-600 mt-3 text-base font-semibold">{error}</div>}
         {/* Résultats selon le type de widget */}
         {widget.type === "global" && res && res.detailedSummary && (
           <div className="mt-6 space-y-8">
@@ -406,6 +451,7 @@ function WidgetCard({
             </h3>
             {Array.isArray(res) && res.length > 0 ? (
               res.map((item: any, idx: number) => {
+                if (!item) return null;
                 const charts = item.charts || [];
                 const selectedChartIdx = selectedChartIdxs[idx] || 0;
                 const selectedChart = charts[selectedChartIdx];
@@ -553,6 +599,156 @@ function WidgetCard({
                             {chartComponent}
                           </div>
                         )}
+                        <div key={"custom-chart-"+idx} className="mt-2">
+                          <input
+                            type="text"
+                            placeholder="Ex: coûts en fonction du personnel"
+                            value={customChartQueries[idx] || ''}
+                            onChange={e => setCustomChartQueries(q => ({ ...q, [idx]: e.target.value }))}
+                            className="border rounded px-2 py-1 text-sm w-72 mr-2"
+                          />
+                          <Button
+                            size="sm"
+                            onClick={async () => {
+                              setCustomChartLoading(l => ({ ...l, [idx]: true }));
+                              setCustomChartErrors(e => ({ ...e, [idx]: null }));
+                              try {
+                                const resp = await fetch("/api/ai-analyze/excel-custom-chart", {
+                                  method: "POST",
+                                  headers: { "Content-Type": "application/json" },
+                                  body: JSON.stringify({ key: item.key, query: customChartQueries[idx] })
+                                });
+                                const data = await resp.json();
+                                if (data.chart) {
+                                  setCustomChartResults(r => ({ ...r, [idx]: data }));
+                                } else {
+                                  setCustomChartErrors(e => ({ ...e, [idx]: data.error || "Erreur inconnue" }));
+                                }
+                              } catch (err: any) {
+                                setCustomChartErrors(e => ({ ...e, [idx]: err.message }));
+                              } finally {
+                                setCustomChartLoading(l => ({ ...l, [idx]: false }));
+                              }
+                            }}
+                            disabled={!customChartQueries[idx] || customChartLoading[idx]}
+                          >
+                            {customChartLoading[idx] ? "Chargement..." : "Générer graphique personnalisé"}
+                          </Button>
+                          {customChartErrors[idx] && <div className="text-red-600 text-xs mt-1">{customChartErrors[idx]}</div>}
+                          {customChartResults[idx]?.chart && (
+                            <div className="mt-3">
+                              <ChartWithExport
+                                chartType={customChartResults[idx].chart.type}
+                                chartData={{
+                                  labels: customChartResults[idx].data.map((row: any) => row[customChartResults[idx].chart.x]),
+                                  datasets: [{
+                                    label: customChartResults[idx].chart.y,
+                                    data: customChartResults[idx].data.map((row: any) => parseFloat(row[customChartResults[idx].chart.y]) || 0),
+                                    backgroundColor: '#22c55e',
+                                    borderColor: '#22c55e',
+                                  }],
+                                }}
+                                chartOptions={{ responsive: true, plugins: { legend: { display: true } } }}
+                                title={customChartResults[idx].chart.title}
+                                explanation={customChartResults[idx].chart.explanation}
+                                axes={`Axe X : ${customChartResults[idx].chart.x} | Axe Y : ${customChartResults[idx].chart.y}`}
+                              />
+                            </div>
+                          )}
+                        </div>
+                        <Button size="sm" variant="outline" className="mt-2" onClick={() => setShowManualChart(v => !v)}>
+                          {showManualChart ? 'Annuler la création manuelle' : 'Créer un graphique personnalisé'}
+                        </Button>
+                        {showManualChart && (
+                          <div className="mt-3 p-3 border rounded bg-gray-50">
+                            <div className="mb-2 font-semibold">Créer un graphique personnalisé</div>
+                            <div className="flex flex-col gap-2 mb-3">
+                              <label className="font-medium">Décrivez le graphique souhaité (ex: coût par département, camembert des effectifs par chef d'équipe) :</label>
+                              <div className="flex gap-2">
+                                <input value={manualPhrase} onChange={e => setManualPhrase(e.target.value)} className="flex-1 border rounded px-2 py-1" placeholder="Ex: coût par département" />
+                                <Button size="sm" onClick={() => {
+                                  // Suggestion locale simple : détecter les mots clés dans la phrase
+                                  const phrase = manualPhrase.toLowerCase();
+                                  let type: 'bar'|'line'|'pie' = 'bar';
+                                  if (phrase.includes('camembert') || phrase.includes('pie')) type = 'pie';
+                                  if (phrase.includes('courbe') || phrase.includes('line')) type = 'line';
+                                  // Trouver X et Y par heuristique simple
+                                  const cols = item.data && Object.keys(item.data[0] || {});
+                                  let x = '';
+                                  let y = '';
+                                  if (cols) {
+                                    for (const col of cols) {
+                                      if (phrase.includes(col.toLowerCase())) {
+                                        if (!x) x = col;
+                                        else if (!y) y = col;
+                                      }
+                                    }
+                                    // Si pas trouvé, fallback
+                                    if (!x) x = cols[0];
+                                    if (!y) y = cols.find((c: string) => item.data.some((row: any) => !isNaN(parseFloat(row[c])))) || cols[1] || cols[0];
+                                  }
+                                  setManualType(type);
+                                  setManualX(x);
+                                  setManualY(y);
+                                  setManualTitle(manualPhrase);
+                                }}>Générer automatiquement</Button>
+                              </div>
+                            </div>
+                            <div className="flex flex-wrap gap-2 mb-2 items-end">
+                              <label>Colonne X :
+                                <select value={manualX} onChange={e => setManualX(e.target.value)} className="ml-2 border rounded px-2 py-1">
+                                  <option value="">--</option>
+                                  {item.data && Object.keys(item.data[0] || {}).map(col => (
+                                    <option key={col} value={col}>{col}</option>
+                                  ))}
+                                </select>
+                              </label>
+                              <label>Colonne Y :
+                                <select value={manualY} onChange={e => setManualY(e.target.value)} className="ml-2 border rounded px-2 py-1">
+                                  <option value="">--</option>
+                                  {item.data && Object.keys(item.data[0] || {}).filter((col: string) => item.data.some((row: any) => !isNaN(parseFloat(row[col])))).map(col => (
+                                    <option key={col} value={col}>{col}</option>
+                                  ))}
+                                </select>
+                              </label>
+                              <label>Type :
+                                <select value={manualType} onChange={e => setManualType(e.target.value as any)} className="ml-2 border rounded px-2 py-1">
+                                  <option value="bar">Barres</option>
+                                  <option value="line">Courbe</option>
+                                  <option value="pie">Camembert</option>
+                                </select>
+                              </label>
+                              <label>Titre :
+                                <input value={manualTitle} onChange={e => setManualTitle(e.target.value)} className="ml-2 border rounded px-2 py-1" placeholder="Titre du graphique" />
+                              </label>
+                            </div>
+                            {manualX && manualY && (
+                              <>
+                                <ChartWithExport
+                                  chartType={manualType}
+                                  chartData={{
+                                    labels: item.data.map((row: any) => row[manualX]),
+                                    datasets: [{
+                                      label: manualY,
+                                      data: item.data.map((row: any) => parseFloat(row[manualY]) || 0),
+                                      backgroundColor: '#22c55e',
+                                      borderColor: '#22c55e',
+                                    }],
+                                  }}
+                                  chartOptions={{ responsive: true, plugins: { legend: { display: true } } }}
+                                  title={manualTitle || `${manualType} de ${manualY} par ${manualX}`}
+                                  axes={`Axe X : ${manualX} | Axe Y : ${manualY}`}
+                                />
+                                <Button size="sm" className="mt-2" onClick={() => {
+                                  setManualFavorites(favs => [
+                                    ...favs,
+                                    { x: manualX, y: manualY, type: manualType, title: manualTitle }
+                                  ]);
+                                }}>Ajouter aux favoris</Button>
+                              </>
+                            )}
+                          </div>
+                        )}
                       </>
                     )}
                   </section>
@@ -596,19 +792,117 @@ function WidgetCard({
           </div>
         )}
         {widget.type === "devis" && res && (
-          <div className="mt-6 space-y-4">
+          <div className="mt-6 space-y-6">
             <h3 className="text-pink-900 font-bold text-lg mb-2 flex items-center gap-2">
               <FileText className="h-5 w-5 text-pink-600" /> Analyse Devis
             </h3>
-            {Array.isArray(res) && res.length > 0 ? (
-              <ul className="list-disc pl-6 text-pink-800">
-                {res.map((item: any, idx: number) => (
-                  <li key={idx}>{typeof item === "string" ? item : JSON.stringify(item)}</li>
-                ))}
-              </ul>
+            {Array.isArray(devisRes) && devisRes.length > 0 ? (
+              devisRes.map((item: any, idx: number) => {
+                if (!item) return null;
+                const local = item.localExtract || {};
+                // Calcul cohérence totaux
+                let sumLignes = 0;
+                if (item.lignes && Array.isArray(item.lignes)) {
+                  sumLignes = item.lignes.reduce((acc: number, l: any) => acc + (parseFloat(l.totalLigne || l.total || 0) || 0), 0);
+                }
+                const incoherence = item.totalHT && Math.abs(sumLignes - parseFloat(item.totalHT)) > 1;
+                return (
+                  <React.Fragment key={idx}>
+                    {local.warning && (
+                      <section className="mb-4 p-3 bg-yellow-50 border border-yellow-300 rounded">
+                        <div className="text-yellow-800 font-semibold mb-2 flex items-center gap-2">
+                          ⚠️ {local.warning}
+                        </div>
+                        <div className="mb-2">
+                          <span className="font-medium text-gray-700">Texte extrait du PDF&nbsp;:</span>
+                          <pre className="bg-gray-100 p-2 rounded text-xs max-h-64 overflow-auto border mt-1">{local.cleanedText?.slice(0, 5000) || "(vide)"}</pre>
+                        </div>
+                        <Button size="sm" variant="outline" onClick={() => {
+                          const blob = new Blob([local.cleanedText || ""], { type: 'text/plain' });
+                          const url = URL.createObjectURL(blob);
+                          const a = document.createElement('a');
+                          a.href = url;
+                          a.download = 'texte_extrait_devis.txt';
+                          a.click();
+                          URL.revokeObjectURL(url);
+                        }}>Télécharger le texte extrait</Button>
+                      </section>
+                    )}
+                    {!local.warning && (
+                      <>
+                        <div className={`mb-3 p-3 rounded flex gap-6 items-center ${incoherence ? 'bg-red-100 border border-red-400' : 'bg-pink-100 border border-pink-200'}`}>
+                          <div>
+                            <span className="text-xs text-gray-500">Total HT</span><br/>
+                            <span className="text-lg font-bold text-pink-900">{item.totalHT || '-'}</span>
+                          </div>
+                          <div>
+                            <span className="text-xs text-gray-500">TVA</span><br/>
+                            <span className="text-lg font-bold text-pink-900">{item.tva || '-'}</span>
+                          </div>
+                          <div>
+                            <span className="text-xs text-gray-500">Total TTC</span><br/>
+                            <span className="text-lg font-bold text-pink-900">{item.totalTTC || '-'}</span>
+                          </div>
+                          <div>
+                            <span className="text-xs text-gray-500">Somme lignes</span><br/>
+                            <span className="text-lg font-bold text-pink-900">{sumLignes.toFixed(2)}</span>
+                          </div>
+                          {incoherence && <span className="text-red-700 font-semibold ml-4">Incohérence détectée !</span>}
+                        </div>
+                        {/* Tableau des lignes */}
+                        {item.lignes && Array.isArray(item.lignes) && item.lignes.length > 0 && (
+                          <div className="overflow-x-auto mb-2">
+                            <table className="min-w-full border text-xs bg-white">
+                              <thead>
+                                <tr>
+                                  {Object.keys(item.lignes[0]).map((col, i) => <th key={i} className="border px-2 py-1 bg-pink-100 text-pink-900">{col}</th>)}
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {item.lignes.map((ligne: any, i: number) => (
+                                  <tr key={i} className={local.lines && local.lines[i] && JSON.stringify(ligne) !== JSON.stringify(local.lines[i]) ? 'bg-yellow-50' : ''}>
+                                    {Object.values(ligne).map((val, j) => <td key={j} className="border px-2 py-1">{val !== null && val !== undefined ? val.toString() : ""}</td>)}
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                            <Button size="sm" variant="outline" className="mt-2" onClick={() => {
+                              const csv = [Object.keys(item.lignes[0]).join(',')].concat(item.lignes.map((l: any) => Object.values(l).join(','))).join('\n');
+                              const blob = new Blob([csv], { type: 'text/csv' });
+                              const url = URL.createObjectURL(blob);
+                              const a = document.createElement('a');
+                              a.href = url;
+                              a.download = 'devis_lignes.csv';
+                              a.click();
+                              URL.revokeObjectURL(url);
+                            }}>Exporter CSV</Button>
+                          </div>
+                        )}
+                      </>
+                    )}
+                  </React.Fragment>
+                );
+              })
+            ) : devisRes && typeof devisRes === 'object' && 'error' in devisRes ? (
+              <div className="text-red-600">{devisRes.error}</div>
             ) : (
               <div className="text-gray-500">Aucun résultat d'analyse.</div>
             )}
+          </div>
+        )}
+        {manualFavorites.length > 0 && (
+          <div className="mt-4">
+            <div className="font-semibold mb-1">Favoris graphiques</div>
+            <ul className="space-y-1">
+              {manualFavorites.map((fav, i) => (
+                <li key={i} className="flex items-center gap-2">
+                  <Button size="sm" variant="ghost" onClick={() => {
+                    setManualX(fav.x); setManualY(fav.y); setManualType(fav.type); setManualTitle(fav.title);
+                  }}>{fav.title || `${fav.type} de ${fav.y} par ${fav.x}`}</Button>
+                  <Button size="icon" variant="ghost" onClick={() => setManualFavorites(favs => favs.filter((_, j) => j !== i))}>🗑️</Button>
+                </li>
+              ))}
+            </ul>
           </div>
         )}
       </CardContent>
@@ -711,6 +1005,7 @@ export default function AiDashboardPage() {
   const [dragActive, setDragActive] = useState(false)
   const [selectedFiles, setSelectedFiles] = useState<File[]>([])
   const fileInputRef = useRef<HTMLInputElement | null>(null)
+  const [showSelection, setShowSelection] = useState(true); // par défaut ouvert
 
   useEffect(() => {
     const fetchDocuments = async () => {
@@ -732,6 +1027,7 @@ export default function AiDashboardPage() {
 
   // Analyse par widget
   const handleAnalyze = async (id: number, type: string) => {
+    setShowSelection(false); // Ferme la sélection
     setWidgetLoading(id, true)
     setWidgetError(id, null)
     setWidgetResult(id, null)

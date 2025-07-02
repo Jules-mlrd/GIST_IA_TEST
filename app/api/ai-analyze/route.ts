@@ -4,6 +4,7 @@ import s3 from "@/lib/s3Client"
 import pdfParse from "pdf-parse"
 import OpenAI from "openai"
 import path from "path"
+import { readPdfFromS3Robust } from "@/lib/readPdfRobust"
 
 // Si tu as une erreur 'Cannot find module "openai"', installe-le avec : npm install openai
 
@@ -32,9 +33,7 @@ async function readTxtFromS3(key: string) {
 }
 
 async function readPdfFromS3(key: string) {
-  const buffer = await getS3FileBuffer(key)
-  const data = await pdfParse(buffer)
-  return data.text
+  return await readPdfFromS3Robust(key);
 }
 
 async function readDocxFromS3(key: string) {
@@ -100,6 +99,90 @@ const FILE_HANDLERS: Record<string, (key: string) => Promise<string | Buffer>> =
   doc: readDocxFromS3,
 }
 
+// Fonction utilitaire pour extraire le premier objet JSON valide d'une chaîne
+function extractFirstJsonObject(str: string) {
+  const match = str.match(/{[\s\S]*}/);
+  if (!match) return null;
+  try {
+    return JSON.parse(match[0]);
+  } catch {
+    return null;
+  }
+}
+
+// Extraction locale pour devis (regex/heuristique)
+function extractDevisData(text: string) {
+  // Nettoyage de base
+  let cleanedText = text
+    .replace(/Page \d+\/\d+/g, '')
+    .replace(/\r/g, '')
+    .replace(/\u00a0/g, ' ')
+    .replace(/\t/g, '    ')
+    .replace(/\n{2,}/g, '\n')
+    .replace(/[•·●]/g, '-')
+    .trim();
+
+  // Patterns de lignes (tab, espaces multiples, points-virgules, pipe)
+  const patterns = [
+    { name: 'tab', regex: /^(.*?)(?:\t| {2,})(\d+(?:[.,]\d+)?)(?:\t| {2,})(\d+(?:[.,]\d+)?)(?:\t| {2,})(\d+(?:[.,]\d+)?)/gm },
+    { name: 'semicolon', regex: /^(.*?);(\d+(?:[.,]\d+)?);(\d+(?:[.,]\d+)?);(\d+(?:[.,]\d+)?)/gm },
+    { name: 'pipe', regex: /^(.*?)\|(\d+(?:[.,]\d+)?)\|(\d+(?:[.,]\d+)?)\|(\d+(?:[.,]\d+)?)/gm },
+    { name: 'spaces', regex: /^(.*?)(?:\s{2,})(\d+(?:[.,]\d+)?)(?:\s{2,})(\d+(?:[.,]\d+)?)(?:\s{2,})(\d+(?:[.,]\d+)?)/gm },
+  ];
+  let lines: any[] = [];
+  let patternUsed = null;
+  for (const pat of patterns) {
+    let match;
+    let found = false;
+    while ((match = pat.regex.exec(cleanedText)) !== null) {
+      found = true;
+      lines.push({
+        description: match[1].trim(),
+        quantite: match[2].replace(',', '.'),
+        prixUnitaire: match[3].replace(',', '.'),
+        totalLigne: match[4].replace(',', '.')
+      });
+    }
+    if (found) {
+      patternUsed = pat.name;
+      break;
+    }
+  }
+  // Filtrage des lignes plausibles
+  const plausibleLines = lines.filter(l => {
+    // Description non vide, quantite/prix/total > 0, pas de lignes bruitées
+    const q = parseFloat(l.quantite);
+    const p = parseFloat(l.prixUnitaire);
+    const t = parseFloat(l.totalLigne);
+    return (
+      l.description && l.description.length > 1 &&
+      !/^([A-Z]{2,}|[0-9]{4,})$/.test(l.description) && // pas que des lettres/chiffres
+      !isNaN(q) && !isNaN(p) && !isNaN(t) &&
+      q > 0 && p > 0 && t >= 0
+    );
+  });
+  // Extraction des totaux (plus tolérant)
+  function extractTotal(label: string) {
+    const rgx = new RegExp(label + '\\s*:?\\s*([\u20ac\d., ]+)', 'i');
+    const found = cleanedText.match(rgx);
+    if (found) {
+      return found[1].replace(/[^\d.,]/g, '').replace(',', '.');
+    }
+    return null;
+  }
+  const totalHT = extractTotal('total\\s*ht');
+  const tva = extractTotal('tva');
+  const totalTTC = extractTotal('total\\s*ttc');
+
+  // Message d'avertissement si aucune ligne plausible détectée
+  let warning = null;
+  if (!plausibleLines.length) {
+    warning = "Aucune ligne de tableau exploitable détectée automatiquement. Le PDF est peut-être mal structuré, bruité ou le tableau n'est pas reconnu. Les totaux ont été extraits si possible. Vous pouvez vérifier le texte extrait ci-dessous.";
+  }
+
+  return { lines: plausibleLines, totalHT, tva, totalTTC, cleanedText, patternUsed, warning };
+}
+
 export async function POST(req: Request) {
   let keys: string[] = []
   try {
@@ -160,16 +243,67 @@ export async function POST(req: Request) {
   let devisAnalysis: any[] = []
   for (const devis of devisTexts) {
     try {
-      const prompt = PROMPTS.devis(truncateText(devis.text))
-      const aiResp = await askOpenAI(prompt)
-      const jsonStart = aiResp.indexOf("{")
-      const jsonEnd = aiResp.lastIndexOf("}") + 1
-      const jsonString = aiResp.slice(jsonStart, jsonEnd)
-      const data = JSON.parse(jsonString)
-      devisAnalysis.push({ key: devis.key, ...data })
+      // Pré-analyse locale
+      const localExtract = extractDevisData(devis.text);
+      let data = null;
+      if (localExtract.lines && localExtract.lines.length > 0) {
+        // Prompt enrichi classique
+        const prompt = `Voici le texte d'un devis fournisseur :\n"""\n${localExtract.cleanedText}\n"""\nVoici ce que j'ai extrait automatiquement :\nLignes : ${JSON.stringify(localExtract.lines, null, 2)}\nTotaux détectés : HT=${localExtract.totalHT}, TVA=${localExtract.tva}, TTC=${localExtract.totalTTC}\nMerci de corriger/compléter si besoin et de répondre en JSON structuré : { resume: {...}, totaux: {...}, anomalies: [...], lignes: [...], autresInfos: {...}, texteExtrait: "..." }`;
+        const aiResp = await askOpenAI(prompt)
+        const jsonStart = aiResp.indexOf("{")
+        const jsonEnd = aiResp.lastIndexOf("}") + 1
+        const jsonString = aiResp.slice(jsonStart, jsonEnd)
+        data = JSON.parse(jsonString)
+        // Normalisation des sections
+        devisAnalysis.push({
+          key: devis.key,
+          resume: data.resume || {},
+          totaux: data.totaux || {
+            totalHT: data.totalHT || localExtract.totalHT || null,
+            tva: data.tva || localExtract.tva || null,
+            totalTTC: data.totalTTC || localExtract.totalTTC || null,
+            sommeLignes: Array.isArray(data.lignes) ? data.lignes.reduce((acc: number, l: any) => acc + (parseFloat(l.totalLigne || l.total || 0) || 0), 0) : null
+          },
+          anomalies: data.anomalies || [],
+          lignes: data.lignes || [],
+          autresInfos: data.autresInfos || {},
+          texteExtrait: localExtract.cleanedText,
+          localExtract
+        })
+      } else {
+        // Fallback : prompt ultra-guidé
+        const fallbackPrompt = `Le tableau du devis n'a pas été reconnu automatiquement. Voici le texte extrait :\n"""\n${localExtract.cleanedText}\n"""\nTente de reconstituer les sections suivantes, même si le texte est bruité ou mal structuré :\n- resume : fiche synthétique (fournisseur, date, objet, etc.)\n- totaux : totalHT, tva, totalTTC, sommeLignes\n- anomalies : liste d'anomalies ou incohérences\n- lignes : tableau des lignes (description, quantité, prix unitaire, total ligne)\n- autresInfos : mentions légales, conditions, etc.\n- texteExtrait : le texte brut extrait\nRéponds uniquement en JSON structuré, même si certains champs sont partiels ou incertains.\nExemple : {\n  "resume": {"fournisseur": "Nom", "date": "2024-06-01", "objet": "Achat"},\n  "totaux": {"totalHT": "200", "tva": "40", "totalTTC": "240", "sommeLignes": "200"},\n  "anomalies": ["Total TTC incohérent"],\n  "lignes": [{"description": "Fourniture X", "quantite": "2", "prixUnitaire": "100", "totalLigne": "200"}],\n  "autresInfos": {"conditions": "30 jours fin de mois"},\n  "texteExtrait": "..."\n}`;
+        let aiResp = await askOpenAI(fallbackPrompt)
+        let jsonStart = aiResp.indexOf("{")
+        let jsonEnd = aiResp.lastIndexOf("}") + 1
+        let jsonString = aiResp.slice(jsonStart, jsonEnd)
+        try {
+          data = JSON.parse(jsonString)
+          devisAnalysis.push({
+            key: devis.key,
+            resume: data.resume || {},
+            totaux: data.totaux || {
+              totalHT: data.totalHT || localExtract.totalHT || null,
+              tva: data.tva || localExtract.tva || null,
+              totalTTC: data.totalTTC || localExtract.totalTTC || null,
+              sommeLignes: Array.isArray(data.lignes) ? data.lignes.reduce((acc: number, l: any) => acc + (parseFloat(l.totalLigne || l.total || 0) || 0), 0) : null
+            },
+            anomalies: data.anomalies || [],
+            lignes: data.lignes || [],
+            autresInfos: data.autresInfos || {},
+            texteExtrait: localExtract.cleanedText,
+            localExtract,
+            fallback: true
+          })
+        } catch (e) {
+          // Si parsing échoue, retourne warning et texte brut comme avant
+          devisAnalysis.push({ key: devis.key, error: "Erreur IA ou parsing (fallback)", details: String(e), localExtract })
+        }
+      }
     } catch (e: any) {
-      console.error("[AI/Parsing][Devis]", { key: devis.key, error: e?.message, stack: e?.stack, prompt: PROMPTS.devis(truncateText(devis.text)), response: e?.response || null })
-      devisAnalysis.push({ key: devis.key, error: "Erreur IA ou parsing", details: e?.message })
+      // Toujours retourner le texte extrait, le warning, et les lignes plausibles même en cas d'erreur IA
+      const localExtract = extractDevisData(devis.text);
+      devisAnalysis.push({ key: devis.key, error: "Erreur IA ou parsing", details: e?.message, localExtract })
     }
   }
 
@@ -179,21 +313,123 @@ export async function POST(req: Request) {
       const { parseStructuredFile } = await import("@/lib/readCsv")
       const parsed = await parseStructuredFile(excel.buffer, excel.key)
       let summary = parsed.summary || ""
-      if (parsed.data && parsed.data.length > 0) {
-        const preview = JSON.stringify(parsed.data.slice(0, 5))
-        const prompt = PROMPTS.excel(preview, excel.ext)
-        const aiResp = await askOpenAI(prompt)
-        const jsonStart = aiResp.indexOf("{")
-        const jsonEnd = aiResp.lastIndexOf("}") + 1
-        const jsonString = aiResp.slice(jsonStart, jsonEnd)
-        const aiData = JSON.parse(jsonString)
-        excelAnalysis.push({ key: excel.key, ...parsed, ...aiData })
-      } else {
-        excelAnalysis.push({ key: excel.key, ...parsed })
+      let data = Array.isArray(parsed.data) ? parsed.data.slice(0, 20) : [];
+      // Limiter à 20 colonnes max
+      if (data.length > 0) {
+        const allCols = Object.keys(data[0]);
+        const limitedCols = allCols.slice(0, 20);
+        data = data.map(row => {
+          const newRow: any = {};
+          for (const col of limitedCols) newRow[col] = row[col];
+          return newRow;
+        });
       }
+      // Détection auto des colonnes numériques/catégorielles
+      const columns = data.length > 0 ? Object.keys(data[0]) : [];
+      const numericCols = columns.filter(col => data.every(row => typeof row[col] === 'number' || (!isNaN(parseFloat(row[col])) && row[col] !== null && row[col] !== '')));
+      const catCols = columns.filter(col => !numericCols.includes(col));
+      // Générer des suggestions auto de graphiques
+      const autoCharts: any[] = [];
+      if (numericCols.length && catCols.length) {
+        // Bar chart : 1 cat, 1 num
+        autoCharts.push({ title: `Répartition ${numericCols[0]} par ${catCols[0]}`, type: 'bar', x: catCols[0], y: numericCols[0], explanation: `Bar chart de ${numericCols[0]} par ${catCols[0]}` });
+        // Pie chart : 1 cat, 1 num
+        autoCharts.push({ title: `Camembert ${numericCols[0]} par ${catCols[0]}`, type: 'pie', x: catCols[0], y: numericCols[0], explanation: `Camembert de ${numericCols[0]} par ${catCols[0]}` });
+      }
+      if (numericCols.length >= 2) {
+        // Line chart : 2 num
+        autoCharts.push({ title: `Courbe ${numericCols[1]} vs ${numericCols[0]}`, type: 'line', x: numericCols[0], y: numericCols[1], explanation: `Courbe de ${numericCols[1]} en fonction de ${numericCols[0]}` });
+      }
+      // Statistiques pour prompt IA
+      const stats: Record<string, any> = {};
+      for (const col of numericCols) {
+        const vals = data.map(row => parseFloat(row[col])).filter(v => !isNaN(v));
+        if (vals.length) {
+          stats[col] = {
+            min: Math.min(...vals),
+            max: Math.max(...vals),
+            mean: (vals.reduce((a, b) => a + b, 0) / vals.length).toFixed(2),
+          };
+        }
+      }
+      let aiData = {};
+      let charts = [];
+      if (data.length > 0) {
+        // Détection locale du type de chaque colonne + stats + identifiants uniques
+        function detectType(values: any[]) {
+          if (values.every((v: any) => typeof v === 'number' || (!isNaN(parseFloat(v)) && v !== null && v !== ''))) return 'numérique';
+          if (values.every((v: any) => typeof v === 'string' && !isNaN(Date.parse(v)))) return 'date';
+          if (values.every((v: any) => typeof v === 'boolean')) return 'booléen';
+          if (values.every((v: any) => typeof v === 'string')) return 'texte';
+          return 'texte';
+        }
+        function isUnique(values: any[]) {
+          const set = new Set(values.map(v => v?.toString?.() ?? ''));
+          return set.size === values.length;
+        }
+        const columns = Object.keys(data[0]);
+        const columnSamples = columns.map(col => {
+          const vals = data.slice(0, 20).map(row => row[col]);
+          const type = detectType(vals);
+          const unique = isUnique(vals);
+          const colObj: any = {
+            name: col,
+            type,
+            examples: vals.slice(0, 3),
+            unique
+          };
+          if (type === 'numérique') {
+            const nums = vals.map((v: any) => parseFloat(v)).filter((v: number) => !isNaN(v));
+            if (nums.length) {
+              colObj.min = Math.min(...nums);
+              colObj.max = Math.max(...nums);
+              colObj.mean = parseFloat((nums.reduce((a, b) => a + b, 0) / nums.length).toFixed(2));
+            }
+          }
+          return colObj;
+        });
+        // Filtrer les identifiants uniques
+        const filteredColumns = columnSamples.filter(c => !c.unique);
+        // Prompt ultra-guidé
+        const prompt = `Contexte : Ce tableau provient d'un projet SNCF. Les colonnes sont listées ci-dessous avec leur type détecté, des exemples de valeurs, et un résumé statistique pour les colonnes numériques.\n\nColonnes :\n${JSON.stringify(filteredColumns, null, 2)}\n\nRègles :\n- Propose 1 à 3 graphiques maximum, chacun sous la forme {type, x, y, title, explanation}.\n- Ne propose que des croisements pertinents statistiquement ET métier (ex : "Coût par Département", "Nombre de membres par Chef d'équipe").\n- N'invente pas de croisements absurdes (ex : deux colonnes texte, deux dates, identifiants uniques, etc.).\n- Ignore les colonnes qui semblent être des identifiants uniques ou des codes.\n- Pour chaque graphique, explique en 1 phrase pourquoi il est pertinent pour un chef de projet SNCF.\n- Si aucune combinaison n'est pertinente, réponds [].\n\nExemples de graphiques pertinents :\n- Barres : "Coût" par "Département"\n- Camembert : "Nombre de membres" par "Chef d'équipe"\n- Courbe : "Coût" en fonction du temps (si une colonne date existe)\n\nRéponds uniquement en JSON, sans texte autour, sous la forme :\n[\n  { "type": "bar", "x": "Département", "y": "Coût", "title": "Répartition du coût par département", "explanation": "Permet de visualiser les coûts par service pour optimiser le budget." },\n  ...\n]`;
+        const aiResp = await askOpenAI(prompt);
+        let aiCharts = [];
+        try {
+          aiCharts = JSON.parse(aiResp.match(/\[([\s\S]*?)\]/)?.[0] || '[]');
+        } catch { aiCharts = []; }
+        // Fallback automatique si rien de pertinent
+        if (!aiCharts.length) {
+          const firstCat = filteredColumns.find(c => c.type === 'texte');
+          const firstNum = filteredColumns.find(c => c.type === 'numérique');
+          const firstDate = filteredColumns.find(c => c.type === 'date');
+          if (firstCat && firstNum) {
+            aiCharts.push({ type: 'bar', x: firstCat.name, y: firstNum.name, title: `Répartition ${firstNum.name} par ${firstCat.name}`, explanation: `Bar chart de ${firstNum.name} par ${firstCat.name}` });
+            aiCharts.push({ type: 'pie', x: firstCat.name, y: firstNum.name, title: `Camembert ${firstNum.name} par ${firstCat.name}`, explanation: `Camembert de ${firstNum.name} par ${firstCat.name}` });
+          }
+          if (firstDate && firstNum) {
+            aiCharts.push({ type: 'line', x: firstDate.name, y: firstNum.name, title: `Courbe ${firstNum.name} en fonction de ${firstDate.name}`, explanation: `Courbe de ${firstNum.name} en fonction de ${firstDate.name}` });
+          }
+        }
+        charts = aiCharts;
+        // On peut aussi garder l'ancien prompt pour résumé/keypoints
+        const preview = JSON.stringify(data);
+        const statsStr = Object.keys(stats).length ? `\nStatistiques colonnes numériques: ${JSON.stringify(stats)}` : '';
+        const promptSummary = PROMPTS.excel(preview + statsStr, excel.ext);
+        const aiRespSummary = await askOpenAI(promptSummary);
+        const jsonStart = aiRespSummary.indexOf("{");
+        const jsonEnd = aiRespSummary.lastIndexOf("}") + 1;
+        try {
+          if (jsonStart !== -1 && jsonEnd > jsonStart) {
+            aiData = JSON.parse(aiRespSummary.slice(jsonStart, jsonEnd));
+          }
+        } catch {}
+      }
+      // Fusionner les suggestions de graphiques (charts IA + autoCharts)
+      const allCharts = [ ...(charts || []), ...autoCharts ];
+      excelAnalysis.push({ key: excel.key, ...parsed, ...aiData, charts: allCharts, data });
     } catch (e: any) {
-      console.error("[AI/Parsing][Excel]", { key: excel.key, error: e?.message, stack: e?.stack })
-      excelAnalysis.push({ key: excel.key, error: "Erreur analyse Excel/CSV", details: e?.message })
+      console.error("[AI/Parsing][Excel]", { key: excel.key, error: e?.message, stack: e?.stack });
+      excelAnalysis.push({ key: excel.key, error: "Erreur analyse Excel/CSV", details: e?.message });
     }
   }
 
@@ -251,4 +487,45 @@ export async function POST(req: Request) {
     pdfAnalysis,
     txtAnalysis,
   })
+}
+
+export async function POST_custom_chart(req: Request) {
+  try {
+    const { key, query } = await req.json();
+    if (!key || !query) {
+      return NextResponse.json({ error: "Clé de fichier ou requête manquante" }, { status: 400 });
+    }
+    const { parseStructuredFile } = await import("@/lib/readCsv");
+    const buffer = await getS3FileBuffer(key);
+    const parsed = await parseStructuredFile(buffer, key);
+    let data = Array.isArray(parsed.data) ? parsed.data.slice(0, 20) : [];
+    if (data.length > 0) {
+      const allCols = Object.keys(data[0]);
+      const limitedCols = allCols.slice(0, 20);
+      data = data.map(row => {
+        const newRow: any = {};
+        for (const col of limitedCols) newRow[col] = row[col];
+        return newRow;
+      });
+    }
+    const preview = JSON.stringify(data);
+    const prompt = `Voici un extrait d'un tableau Excel :\n${preview}\nL'utilisateur demande : \"${query}\". Propose la configuration JSON du graphique le plus pertinent (type, x, y, titre, explication). Réponds uniquement en JSON strictement valide, sans texte autour, sans explication, sans balise.`;
+    const aiResp = await askOpenAI(prompt);
+    console.log("[AI RAW RESPONSE]", aiResp);
+    let chartConfig = extractFirstJsonObject(aiResp);
+    if (!chartConfig) {
+      // Tentative 2 avec prompt plus strict
+      const reformulatedPrompt = `${prompt}\nRéponds uniquement par un objet JSON, sans aucun texte autour. Exemple : {\"type\":\"bar\",\"x\":\"Nom\",\"y\":\"Valeur\",\"title\":\"Titre\",\"explanation\":\"...\"}`;
+      const aiResp2 = await askOpenAI(reformulatedPrompt);
+      console.log("[AI RAW RESPONSE][Tentative 2]", aiResp2);
+      chartConfig = extractFirstJsonObject(aiResp2);
+      if (!chartConfig) {
+        return NextResponse.json({ error: "Impossible d'extraire un JSON valide de la réponse IA.", details: aiResp2 }, { status: 400 });
+      }
+    }
+    return NextResponse.json({ chart: chartConfig, data });
+  } catch (e: any) {
+    console.error("[AI/CustomChart][Excel]", { error: e?.message, stack: e?.stack });
+    return NextResponse.json({ error: "Erreur lors de la génération du graphique personnalisé", details: e?.message }, { status: 500 });
+  }
 } 

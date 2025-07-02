@@ -1,6 +1,6 @@
 import s3 from "./s3Client";
 import { GetObjectCommand, ListObjectsV2Command } from "@aws-sdk/client-s3";
-import pdfParse from "pdf-parse";
+import { extractPdfTextRobust } from "./readPdfRobust";
 
 /**
  * Extracts text from a PDF file stored in an S3 bucket.
@@ -22,7 +22,7 @@ export async function fetchPdfTextFromS3(bucketName: string, fileKey: string): P
       chunks.push(Buffer.from(chunk));
     }
     const pdfBuffer = Buffer.concat(chunks);
-    const text = await extractTextFromPdf(pdfBuffer);
+    const text = await extractPdfTextRobust(pdfBuffer);
     return text;
   } catch (error) {
     console.error('Error fetching or processing PDF:', error);
@@ -36,13 +36,7 @@ export async function fetchPdfTextFromS3(bucketName: string, fileKey: string): P
  * @returns The extracted text as a string.
  */
 export async function extractTextFromPdf(pdfBuffer: Buffer): Promise<string> {
-  try {
-    const data = await pdfParse(pdfBuffer);
-    return data.text;
-  } catch (err) {
-    console.error("Error extracting text from PDF:", err);
-    throw new Error("Unable to read PDF file.");
-  }
+  return extractPdfTextRobust(pdfBuffer);
 }
 
 /**

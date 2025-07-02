@@ -35,6 +35,7 @@ import Link from "next/link"
 const navigationItems = [
   { title: "Accueil", icon: MessageSquare, href: "/help-center" },
   { title: "Project Summary", icon: BarChart3, href: "/project-summary" },
+  { title: "Déclaration d'affaire", icon: FileText, href: "/declaration-affaire" },
   { title: "Documents", icon: FileText, href: "/documents" },
   { title: "Contacts", icon: Users, href: "/contacts" },
   { title: "Risks", icon: AlertTriangle, href: "/risks" },
