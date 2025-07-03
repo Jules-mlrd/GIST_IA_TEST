@@ -60,11 +60,12 @@ export async function DELETE(req: Request) {
     const { id, description } = await req.json();
     let risks = readManualRisks();
     const before = risks.length;
-    risks = risks.filter((r: any) => {
-      if (id && r.id === id) return false;
-      if (description && r.description === description) return false;
-      return true;
-    });
+    // Priorité à l'id si présent
+    if (id) {
+      risks = risks.filter((r: any) => r.id !== id);
+    } else if (description) {
+      risks = risks.filter((r: any) => r.description !== description);
+    }
     if (risks.length === before) {
       return NextResponse.json({ error: 'Risque non trouvé.' }, { status: 404 });
     }

@@ -11,6 +11,7 @@ import { useEffect, useState } from "react"
 
 const RISKS_CACHE_KEY = 'risks_cache_v1';
 const RISKS_CACHE_EXPIRATION_MS = 10 * 60 * 1000; // 10 minutes
+const RISKS_BLACKLIST_KEY = 'risks_blacklist_v1';
 
 export default function RisksPage() {
   const [risks, setRisks] = useState<any[]>([])
@@ -22,6 +23,7 @@ export default function RisksPage() {
   const [formLoading, setFormLoading] = useState(false)
   const [deleteLoading, setDeleteLoading] = useState<string | null>(null)
   const [refreshing, setRefreshing] = useState(false)
+  const [blacklist, setBlacklist] = useState<string[]>([])
 
   const fetchRisks = async () => {
     setLoading(true)
@@ -57,6 +59,14 @@ export default function RisksPage() {
     fetchRisks()
   }, [])
 
+  // Charger la blacklist au montage
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const bl = localStorage.getItem(RISKS_BLACKLIST_KEY)
+      if (bl) setBlacklist(JSON.parse(bl))
+    }
+  }, [])
+
   // Mapping pour affichage (fallback si champ manquant)
   function getSeverity(criticite?: string) {
     if (!criticite) return 'secondary'
@@ -65,13 +75,22 @@ export default function RisksPage() {
     return 'secondary'
   }
 
+  function normalizeCriticite(criticite?: string) {
+    if (!criticite) return "faible";
+    const crit = criticite.toLowerCase();
+    if (/critique|extreme|extrême|critical|urgent|bloquant/.test(crit)) return "critique";
+    if (/élevée|haute|high|important|majeur|major|orange/.test(crit)) return "élevé";
+    if (/moyenne|medium|modéré|modere|jaune|moyen/.test(crit)) return "moyen";
+    if (/faible|low|mineur|minor|vert/.test(crit)) return "faible";
+    return "faible";
+  }
+
   function getSeverityColor(criticite?: string) {
-    if (!criticite) return { variant: "secondary", className: "" };
-    if (/critique|extrême|extreme|critical/i.test(criticite)) return { variant: "destructive", className: "" }; // Rouge
-    if (/élevée|haute|high/i.test(criticite)) return { variant: "default", className: "bg-orange-400 text-white" }; // Orange
-    if (/moyenne|medium/i.test(criticite)) return { variant: "default", className: "bg-yellow-300 text-gray-900" }; // Jaune
-    if (/faible|low/i.test(criticite)) return { variant: "default", className: "bg-green-500 text-white" }; // Vert
-    return { variant: "secondary", className: "" };
+    const norm = normalizeCriticite(criticite);
+    if (norm === "critique") return { variant: "destructive", className: "" };
+    if (norm === "élevé") return { variant: "default", className: "bg-orange-400 text-white" };
+    if (norm === "moyen") return { variant: "default", className: "bg-yellow-300 text-gray-900" };
+    return { variant: "default", className: "bg-green-500 text-white" };
   }
 
   const handleFormChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -110,12 +129,26 @@ export default function RisksPage() {
   const handleDeleteRisk = async (risk: any) => {
     setDeleteLoading(risk.id || risk.description)
     try {
-      const res = await fetch('/api/risks', {
-        method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: risk.id, description: risk.description })
-      })
-      await fetchRisks()
+      if (risk.id) {
+        // Suppression réelle pour les risques manuels
+        await fetch('/api/risks', {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: risk.id, description: risk.description })
+        })
+        // Vider le cache localStorage pour forcer le rechargement depuis l'API
+        if (typeof window !== 'undefined') {
+          localStorage.removeItem(RISKS_CACHE_KEY)
+        }
+        await fetchRisks()
+      } else {
+        // Suppression locale (blacklist) pour les risques IA
+        const newBlacklist = [...blacklist, risk.description]
+        setBlacklist(newBlacklist)
+        if (typeof window !== 'undefined') {
+          localStorage.setItem(RISKS_BLACKLIST_KEY, JSON.stringify(newBlacklist))
+        }
+      }
     } finally {
       setDeleteLoading(null)
     }
@@ -125,6 +158,11 @@ export default function RisksPage() {
     setRefreshing(true)
     try {
       await fetch('/api/risks/refresh', { method: 'POST' })
+      // Vider la blacklist locale
+      setBlacklist([])
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem(RISKS_BLACKLIST_KEY)
+      }
       await fetchRisks()
     } finally {
       setRefreshing(false)
@@ -135,6 +173,9 @@ export default function RisksPage() {
   function isManualRisk(risk: any) {
     return !!risk.id
   }
+
+  // Filtrer les risques blacklistés (IA)
+  const displayedRisks = risks.filter(risk => !blacklist.includes(risk.description))
 
   return (
     <Layout title="Risques" subtitle="Gestion des risques du projet">
@@ -200,37 +241,40 @@ export default function RisksPage() {
                   <TableHead>Criticité</TableHead>
                   <TableHead>Responsable</TableHead>
                   <TableHead>Action</TableHead>
-                  <TableHead></TableHead>
+                  <TableHead>Supprimer</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {risks.length === 0 && (
-                  <TableRow><TableCell colSpan={6}>Aucun risque trouvé dans les documents.</TableCell></TableRow>
+                {displayedRisks.length === 0 && (
+                  <TableRow>
+                    <TableCell colSpan={6}>Aucun risque trouvé dans les documents.</TableCell>
+                  </TableRow>
                 )}
-                {risks.map((risk, idx) => {
+                {displayedRisks.map((risk, idx) => {
                   const sev = getSeverityColor(risk.criticite);
                   return (
                     <TableRow key={risk.id || idx}>
                       <TableCell className="font-medium">{idx + 1}</TableCell>
                       <TableCell>{risk.description || "-"}</TableCell>
                       <TableCell>
-                        <Badge variant={sev.variant as 'default' | 'destructive' | 'secondary' | 'outline'} className={sev.className}>{risk.criticite || "-"}</Badge>
+                        <Badge variant={sev.variant as 'default' | 'destructive' | 'secondary' | 'outline'} className={sev.className}>
+                          {normalizeCriticite(risk.criticite) || "-"}
+                        </Badge>
                       </TableCell>
                       <TableCell>{risk.responsable || "-"}</TableCell>
                       <TableCell>{risk.action || "-"}</TableCell>
                       <TableCell>
-                        {isManualRisk(risk) && (
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="text-red-600 hover:bg-red-100"
-                            onClick={() => handleDeleteRisk(risk)}
-                            disabled={deleteLoading === (risk.id || risk.description)}
-                            title="Supprimer le risque"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
-                        )}
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="text-red-600 hover:bg-red-100"
+                          onClick={() => handleDeleteRisk(risk)}
+                          disabled={deleteLoading === (risk.id || risk.description)}
+                          title="Supprimer ce risque"
+                          aria-label="Supprimer ce risque"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
                       </TableCell>
                     </TableRow>
                   );

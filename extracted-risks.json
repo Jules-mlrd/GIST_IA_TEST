@@ -1,170 +1,275 @@
 [
   {
-    "description": "Saturation en heures de pointe",
-    "criticite": "élevée",
-    "responsable": "Service exploitation SNCF",
-    "action": "Allongement des trains : Rames de 400 mètres"
+    "description": "Saturation en heures de pointe approchant les 95%",
+    "criticite": "élevé",
+    "justification": "La saturation peut entraîner des retards importants et perturber le trafic.",
+    "responsable": "Service Exploitation SNCF",
+    "action": "Étudier les possibilités d'augmentation de capacité ou d'optimisation des horaires."
   },
   {
-    "description": "Capacité maximale approchée",
-    "criticite": "moyenne",
-    "responsable": "Service infrastructure SNCF",
-    "action": "Optimisation des horaires : Intelligence artificielle"
+    "description": "Demande latente de +15% de voyageurs potentiels",
+    "criticite": "moyen",
+    "justification": "Une augmentation soudaine de la demande peut impacter la qualité de service.",
+    "responsable": "Service Marketing SNCF",
+    "action": "Prévoir des campagnes de communication pour informer sur les horaires moins chargés."
   },
   {
-    "description": "Concurrence aérienne et routière",
-    "criticite": "moyenne",
-    "responsable": "Service commercial SNCF",
-    "action": "Maintien de la position de la SNCF"
+    "description": "Concurrence TER pour le partage des sillons",
+    "criticite": "moyen",
+    "justification": "La concurrence peut entraîner des conflits d'horaires et de priorités.",
+    "responsable": "Service Planification SNCF",
+    "action": "Mettre en place une coordination efficace avec les services TER pour optimiser l'utilisation des voies."
   },
   {
-    "description": "Transition écologique",
-    "criticite": "élevée",
-    "responsable": "Service développement durable SNCF",
-    "action": "Objectif neutralité carbone pour 2030"
+    "description": "Capacité de la ligne approchant sa limite théorique",
+    "criticite": "élevé",
+    "justification": "Une capacité maximale atteinte peut entraîner des retards et des perturbations importantes.",
+    "responsable": "Service Infrastructures SNCF",
+    "action": "Étudier des solutions d'augmentation de capacité ou de modernisation des infrastructures."
   },
   {
-    "description": "Rupture d'approvisionnement critique",
-    "criticite": "élevée",
-    "responsable": "Paul Richard",
-    "action": "Mise en place d'une procédure de vérification d'intégrité à l'expédition et d'emballage sécurisé"
+    "description": "Ponctualité à 87%, marge de progression par rapport au Japon",
+    "criticite": "moyen",
+    "justification": "Une ponctualité inférieure à des standards internationaux peut impacter l'image de la ligne.",
+    "responsable": "Service Qualité SNCF",
+    "action": "Analyser les causes des retards et mettre en place des actions correctives."
   },
   {
-    "description": "Retard de 3 semaines sur la phase 1 d'installation",
-    "criticite": "élevée",
-    "responsable": "Jean Martin",
-    "action": "Replanifier les activités d'installation et ajuster le planning"
+    "description": "Intermodalité à développer pour les correspondances",
+    "criticite": "moyen",
+    "justification": "Une mauvaise intermodalité peut dissuader les voyageurs d'utiliser le train.",
+    "responsable": "Service Intermodalité SNCF",
+    "action": "Travailler en collaboration avec les autres modes de transport pour faciliter les correspondances."
   },
   {
-    "description": "Coûts supplémentaires estimés : 280,000 €",
-    "criticite": "moyenne",
-    "responsable": "Sophie Bernard",
-    "action": "Évaluer les possibilités de réduction des coûts supplémentaires"
+    "description": "Services digitaux à moderniser pour améliorer l'expérience client",
+    "criticite": "moyen",
+    "justification": "Une expérience client obsolète peut impacter la satisfaction des voyageurs.",
+    "responsable": "Service Digital SNCF",
+    "action": "Développer des applications mobiles intuitives et des services en ligne performants."
   },
   {
-    "description": "Vol durant transport de 420 eurobalises",
-    "criticite": "élevée",
-    "responsable": "LogiRail Express",
-    "action": "Renforcer les mesures de sécurité lors du transport et mettre en place une géolocalisation temps réel"
+    "description": "Rupture d'approvisionnement des Eurobalises EB-PROG-450",
+    "criticite": "élevé",
+    "justification": "Retard de 3 semaines sur une phase clé du projet avec coûts supplémentaires importants",
+    "responsable": "Service Achats",
+    "action": "Trouver une solution de remplacement rapide ou renforcer les contrôles de sécurité lors des transports"
+  },
+  {
+    "description": "Vol durant le transport des palettes d'eurobalises",
+    "criticite": "élevé",
+    "justification": "Impact majeur sur la livraison des équipements critiques pour le projet",
+    "responsable": "Service Logistique",
+    "action": "Renforcer les mesures de sécurité lors des transports et revoir les procédures de contrôle des scellés"
+  },
+  {
+    "description": "Défaillance sécurité du transport : stationnement non sécurisé",
+    "criticite": "moyen",
+    "justification": "Risque de vol accru lors de stationnements non sécurisés",
+    "responsable": "Service Logistique",
+    "action": "Revoir les procédures de stationnement sécurisé pour les transports sensibles"
+  },
+  {
+    "description": "Défaillance procédure AlphaTech : pas de vérification d'intégrité à l'expédition",
+    "criticite": "moyen",
+    "justification": "Risque de perte ou de vol non détecté lors des expéditions",
+    "responsable": "Service Qualité",
+    "action": "Mettre en place des contrôles d'intégrité systématiques avant expédition"
+  },
+  {
+    "description": "Défaillance contractuelle : assurance transport limitée",
+    "criticite": "moyen",
+    "justification": "Risque financier en cas de sinistre dépassant le plafond d'assurance",
+    "responsable": "Service Juridique",
+    "action": "Revoir les contrats d'assurance pour les transports sensibles"
   },
   {
     "description": "Retard global de 3 semaines sur la phase 1",
-    "criticite": "élevée",
-    "responsable": "Marie Lefebvre",
-    "action": "Parallélisation des phases 2 et 3"
-  },
-  {
-    "description": "Retard initial de 3 semaines rattrapé par optimisation",
-    "criticite": "moyenne",
-    "responsable": "Jean Martin",
-    "action": "Équipes renforcées, travail en 3x8, parallélisation des interventions, support technique renforcé"
-  },
-  {
-    "description": "Retard de livraison du matériel",
-    "criticite": "élevée",
-    "responsable": "Jean Martin",
-    "action": "Suivi régulier de l'avancement de la production et des livraisons"
-  },
-  {
-    "description": "Non-conformité aux normes de sécurité ferroviaire",
-    "criticite": "très élevée",
-    "responsable": "Thomas Moreau",
-    "action": "Renforcement des contrôles qualité et audits réguliers"
-  },
-  {
-    "description": "Indisponibilité du système supérieure à 0.5%",
-    "criticite": "moyenne",
-    "responsable": "Dr. François Lemoine",
-    "action": "Mise en place d'un plan de maintenance préventive renforcée"
-  },
-  {
-    "description": "Vol d'eurobalises programmables EB-PROG-450",
-    "criticite": "élevée",
-    "responsable": "Jean Martin",
-    "action": "Retard de 3 semaines sur la phase 1 d'installation"
-  },
-  {
-    "description": "Vol de 420 eurobalises d'une valeur de 1,47 M€ HT",
-    "criticite": "élevée",
-    "responsable": "Thomas Moreau",
-    "action": "Implications sécuritaires : risque de compromettre la sécurité du futur système ERTMS"
-  },
-  {
-    "description": "Impact financier estimé à 1,787 M€ HT",
-    "criticite": "élevée",
-    "responsable": "Sophie Bernard",
-    "action": "Dépasser la provision pour risques et puiser dans la réserve générale du projet"
-  },
-  {
-    "description": "Retard de 3 semaines sur la phase 1 d'installation",
-    "criticite": "élevée",
-    "responsable": "Marie Lefebvre",
-    "action": "Maintenir l'objectif de mise en service pour février 2027 malgré la réduction des marges"
-  },
-  {
-    "description": "Défaillance logistique dans la chaîne d'approvisionnement",
-    "criticite": "moyenne",
-    "responsable": "Paul Richard",
-    "action": "Renforcer les procédures de sécurité : changement de transporteur, GPS tracking, emballage sécurisé, escorte armée"
-  },
-  {
-    "description": "Responsabilité contractuelle limitée à 50 K€ par sinistre",
-    "criticite": "moyenne",
-    "responsable": "Catherine Blanc",
-    "action": "Engager une procédure d'expertise avec les assureurs pour récupérer le maximum de préjudices"
-  },
-  {
-    "description": "Failles dans l'approche de la sécurité logistique sur les grands projets",
-    "criticite": "élevée",
-    "responsable": "Jean-Claude Ministre",
-    "action": "Tirer des enseignements et recommandations pour renforcer la sécurité logistique"
-  },
-  {
-    "description": "Incompatibilité entre systèmes TVM existants et ERTMS",
     "criticite": "élevé",
-    "responsable": "Marie Lefebvre",
-    "action": "Tests approfondis en laboratoire, période de transition avec exploitation parallèle"
-  },
-  {
-    "description": "Défaillance des nouveaux équipements",
-    "criticite": "moyen",
-    "responsable": "Jean Martin",
-    "action": "Redondance des systèmes critiques, maintenance préventive renforcée"
-  },
-  {
-    "description": "Retard d'approvisionnement équipements critiques",
-    "criticite": "élevé",
+    "justification": "Impact sur le planning global du projet et nécessité de rattrapage.",
     "responsable": "Alice Dupont",
-    "action": "Commandes anticipées, diversification fournisseurs, stocks de sécurité"
+    "action": "Suivi rapproché des activités et ajustement du planning pour le rattrapage."
   },
   {
-    "description": "Perturbation importante du trafic",
+    "description": "Marge résiduelle de 2 semaines vs 5 semaines initialement",
+    "criticite": "moyen",
+    "justification": "Réduction de la marge de sécurité, risque de nouveaux retards.",
+    "responsable": "Alice Dupont",
+    "action": "Identifier les tâches critiques et renforcer le suivi pour éviter de dépasser la marge."
+  },
+  {
+    "description": "Retard possible dans la validation des spécifications techniques",
+    "criticite": "moyen",
+    "justification": "Impact sur la conception détaillée et les jalons critiques.",
+    "responsable": "Marie Lefebvre",
+    "action": "Mettre en place des réunions de suivi régulières pour garantir le respect des délais."
+  },
+  {
+    "description": "Dépendance aux fournisseurs pour les équipements ERTMS",
     "criticite": "élevé",
-    "responsable": "Thomas Moreau",
-    "action": "Travaux de nuit et week-ends, communication voyageurs renforcée, plans de transport adaptés"
+    "justification": "Toute défaillance des fournisseurs peut impacter le planning global.",
+    "responsable": "Alice Dupont",
+    "action": "Mettre en place un suivi renforcé des commandes et des livraisons."
   },
   {
-    "description": "Retard de livraison du matériel",
-    "criticite": "élevée",
-    "responsable": "Jean Dupont",
-    "action": "Relancer le fournisseur"
-  },
-  {
-    "description": "Difficultés liées aux travaux de nuit",
-    "criticite": "moyenne",
-    "responsable": "Marie Durand",
-    "action": "Mettre en place un planning précis et des équipes de nuit dédiées"
-  },
-  {
-    "description": "Retard d’approvisionnement",
-    "criticite": "Élevée",
+    "description": "Risques de retards dans la préparation des sites d'installation",
+    "criticite": "moyen",
+    "justification": "Retards dans la préparation peuvent impacter le démarrage de la phase d'installation.",
     "responsable": "Jean Martin",
-    "action": null
+    "action": "Anticiper les besoins en ressources et en matériel pour éviter les retards."
+  },
+  {
+    "description": "Risques de non-conformité aux mesures sécuritaires renforcées post-incident",
+    "criticite": "élevé",
+    "justification": "Non-respect des mesures de sécurité peut entraîner des conséquences graves.",
+    "responsable": "Alice Dupont",
+    "action": "Mettre en place des contrôles réguliers et des formations spécifiques sur les nouvelles mesures."
+  },
+  {
+    "description": "Risques de retards dans l'installation des postes de signalisation",
+    "criticite": "élevé",
+    "justification": "Impact direct sur la mise en service du tronçon concerné.",
+    "responsable": "Jean Martin",
+    "action": "Renforcer les équipes et planifier des plages horaires supplémentaires si nécessaire."
+  },
+  {
+    "description": "Dépendance aux fournisseurs pour la pose des eurobalises",
+    "criticite": "élevé",
+    "justification": "Toute défaillance des fournisseurs peut retarder les travaux d'installation.",
+    "responsable": "Jean Martin",
+    "action": "Diversifier les sources d'approvisionnement pour limiter les risques de rupture de stock."
+  },
+  {
+    "description": "Retard de livraison des premiers lots d'équipements de signalisation",
+    "criticite": "élevé",
+    "justification": "Le retard pourrait impacter le démarrage du projet et les délais globaux.",
+    "responsable": "Service Logistique AlphaTech",
+    "action": "Suivre de près les fournisseurs et anticiper les retards potentiels."
+  },
+  {
+    "description": "Non-conformité aux normes ferroviaires requises",
+    "criticite": "critique",
+    "justification": "La non-conformité peut entraîner des pénalités, des retards et des risques de sécurité.",
+    "responsable": "Service Qualité AlphaTech",
+    "action": "Effectuer des vérifications régulières et des tests de conformité tout au long du projet."
+  },
+  {
+    "description": "Défaillance des équipements de signalisation en phase de test",
+    "criticite": "élevé",
+    "justification": "Une défaillance peut compromettre la sécurité et la fiabilité du système.",
+    "responsable": "Service Technique AlphaTech",
+    "action": "Réaliser des tests approfondis en amont et prévoir des plans de secours en cas de défaillance."
+  },
+  {
+    "description": "Retard dans la formation des techniciens et agents d'exploitation",
+    "criticite": "moyen",
+    "justification": "Un retard peut impacter la mise en service et la performance opérationnelle.",
+    "responsable": "Service Formation AlphaTech",
+    "action": "Anticiper les besoins en formation et ajuster le planning en conséquence."
+  },
+  {
+    "description": "Pénurie de pièces de rechange en cas de maintenance",
+    "criticite": "élevé",
+    "justification": "Une pénurie peut entraîner des arrêts prolongés et des coûts supplémentaires.",
+    "responsable": "Service Approvisionnement AlphaTech",
+    "action": "Établir un stock de sécurité de pièces critiques et surveiller les niveaux de stock régulièrement."
+  },
+  {
+    "description": "Retard d'approvisionnement des équipements critiques par AlphaTech Solutions",
+    "criticite": "élevé",
+    "justification": "Un retard pourrait impacter l'ensemble du projet et causer des retards conséquents.",
+    "responsable": "Service Achats",
+    "action": "Suivi régulier des livraisons, relances fréquentes et diversification des fournisseurs si possible."
+  },
+  {
+    "description": "Incompatibilité entre les systèmes TVM existants et les nouveaux équipements ERTMS",
+    "criticite": "élevé",
+    "justification": "Une incompatibilité majeure pourrait compromettre le bon fonctionnement de la ligne.",
+    "responsable": "Service Technique",
+    "action": "Tests approfondis en laboratoire et plan de transition clair entre les deux systèmes."
+  },
+  {
+    "description": "Défaillance des nouveaux équipements ERTMS",
+    "criticite": "moyen",
+    "justification": "Une défaillance pourrait entraîner des retards et des coûts supplémentaires.",
+    "responsable": "Service Maintenance",
+    "action": "Mise en place d'une maintenance préventive renforcée et plan de secours en cas de défaillance."
+  },
+  {
+    "description": "Perturbation importante du trafic lors de la mise en service",
+    "criticite": "élevé",
+    "justification": "Une perturbation majeure impacterait la satisfaction des voyageurs et la réputation de SNCF.",
+    "responsable": "Service Exploitation",
+    "action": "Planification minutieuse des travaux, communication proactive et plans de transport alternatifs."
+  },
+  {
+    "description": "Retard de livraison des fibres optiques pour l'infrastructure télécoms",
+    "criticite": "moyen",
+    "justification": "Un retard dans la livraison des fibres optiques pourrait retarder l'installation des équipements.",
+    "responsable": "Service Logistique",
+    "action": "Suivi rapproché des commandes, anticipation des besoins et recherche de solutions de remplacement."
+  },
+  {
+    "description": "Retard possible des travaux de nuit",
+    "criticite": "moyen",
+    "justification": "Les travaux ne peuvent être réalisés que de nuit, ce qui augmente le risque de retard.",
+    "responsable": "Chef de Projet",
+    "action": "Mettre en place un suivi quotidien des avancements et des retards potentiels."
+  },
+  {
+    "description": "Problèmes techniques sur les systèmes de signalisation",
+    "criticite": "élevé",
+    "justification": "Les systèmes de signalisation sont cruciaux pour la sécurité, tout problème technique peut avoir un impact majeur.",
+    "responsable": "Service Technique",
+    "action": "Prévoir des tests approfondis avant la mise en service des nouveaux systèmes."
+  },
+  {
+    "description": "Manque de coordination entre les équipes travaillant de nuit",
+    "criticite": "moyen",
+    "justification": "La coordination est essentielle pour éviter les retards et les erreurs pendant les travaux de nuit.",
+    "responsable": "Chef de Projet",
+    "action": "Organiser des réunions régulières pour assurer une bonne communication entre les équipes."
+  },
+  {
+    "description": "Risque de vol de matériel pendant la nuit",
+    "criticite": "moyen",
+    "justification": "Les travaux se déroulant de nuit, il y a un risque accru de vol de matériel.",
+    "responsable": "Service Sécurité",
+    "action": "Renforcer la surveillance et la sécurité sur le chantier pendant la nuit."
+  },
+  {
+    "description": "Non-respect des normes de sécurité pendant les travaux",
+    "criticite": "élevé",
+    "justification": "Le non-respect des normes de sécurité peut mettre en danger les travailleurs et les usagers.",
+    "responsable": "Service Sécurité",
+    "action": "Organiser des formations régulières sur les normes de sécurité à respecter."
+  },
+  {
+    "description": "Retard dans la communication des informations aux voyageurs",
+    "criticite": "moyen",
+    "justification": "Une communication inefficace peut entraîner des mécontentements et des perturbations pour les voyageurs.",
+    "responsable": "Service Communication",
+    "action": "Mettre en place un plan de communication clair et réactif en cas de retard ou de problème."
+  },
+  {
+    "description": "Retard d’approvisionnement en matériel critique",
+    "criticite": "élevé",
+    "justification": "Un retard pourrait impacter directement le planning des travaux et la qualité du projet.",
+    "responsable": "Jean Martin",
+    "action": "Mettre en place un suivi régulier des approvisionnements et anticiper les éventuels retards."
   },
   {
     "description": "Opposition locale aux travaux",
-    "criticite": "Modérée",
+    "criticite": "moyen",
+    "justification": "Une opposition pourrait entraîner des retards ou des modifications coûteuses.",
     "responsable": "Léa Morel",
-    "action": null
+    "action": "Renforcer la communication avec les parties prenantes locales et anticiper les points de friction."
+  },
+  {
+    "description": "Dépassement potentiel sur le budget d'infrastructure",
+    "criticite": "élevé",
+    "justification": "Un dépassement budgétaire pourrait impacter la qualité des travaux ou nécessiter des arbitrages financiers.",
+    "responsable": "Non précisé",
+    "action": "Mettre en place un suivi financier régulier et des actions correctives si nécessaire."
   }
 ]

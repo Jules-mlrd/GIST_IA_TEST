@@ -139,8 +139,42 @@ export async function extractContactsWithLLM(text: string, apiKey?: string): Pro
  * Utilise OpenAI pour extraire les risques d'un texte (description, criticité, responsable, etc.).
  * Retourne un tableau d'objets structurés.
  */
-export async function extractRisksWithLLM(text: string, apiKey?: string): Promise<Array<{ description?: string, criticite?: string, responsable?: string, action?: string }>> {
-  const prompt = `Voici un texte extrait d'un document de projet SNCF. Extrais uniquement les risques identifiés (description, criticité, responsable, action si possible) présents dans ce texte. Retourne la liste sous forme d'objets JSON, un par risque, exemple : [{"description": "Retard de livraison du matériel", "criticite": "élevée", "responsable": "Jean Dupont", "action": "Relancer le fournisseur"}]. Texte :\n${text}\n\nRéponse :`;
+export async function extractRisksWithLLM(text: string, apiKey?: string): Promise<Array<{ description?: string, criticite?: string, justification?: string, responsable?: string, action?: string }>> {
+  const prompt = `Tu es un assistant expert en gestion des risques projet SNCF.
+
+Ta tâche :
+- Lis attentivement le texte ci-dessous et détecte tous les risques projet, même s'ils sont implicites, mal formulés ou indirects.
+- Pour chaque risque identifié, fournis un objet avec les champs suivants :
+  - description : reformule le risque de façon claire et concise (une phrase)
+  - criticite : choisis parmi "faible", "moyen", "élevé", "critique" selon la gravité ET la probabilité (voir critères ci-dessous)
+  - justification : explique brièvement pourquoi tu as choisi ce niveau de criticité
+  - responsable : indique le nom, la fonction ou le service responsable du risque. Si aucune information n'est trouvée, indique "Non précisé".
+  - action : propose une action concrète de mitigation ou de suivi (si possible, sinon laisse vide)
+
+Critères pour la criticité :
+- faible : impact négligeable, très peu probable (ex : "Erreur mineure sans conséquence", "Retard d'une journée sur une tâche non critique")
+- moyen : impact modéré ou probabilité moyenne (ex : "Retard de quelques jours sur une tâche secondaire", "Oubli d'un livrable intermédiaire")
+- élevé : impact important ou probabilité forte (ex : "Retard de plusieurs semaines sur une tâche clé", "Dépendance fournisseur à risque")
+- critique : impact majeur, bloquant ou très probable (ex : "Blocage total du projet", "Non-conformité légale", "Perte de données majeures", "Arrêt de production")
+
+Consignes :
+- Sois exhaustif : détecte aussi les risques sous-entendus, liés à des retards, des dépendances, des ressources, des erreurs humaines, des problèmes techniques, etc.
+- Pour chaque risque, cherche activement le responsable : nom, fonction, service, ou "Non précisé".
+- Propose une action de mitigation adaptée à chaque risque si possible.
+- Structure la réponse en une liste JSON strictement valide, un objet par risque, maximum 50 objets, exemple :
+[
+  {
+    "description": "Retard de livraison du matériel critique",
+    "criticite": "élevé",
+    "justification": "Le matériel est indispensable et le retard est probable.",
+    "responsable": "Service Achats",
+    "action": "Relancer le fournisseur et ajuster le planning"
+  }
+]
+Texte :
+${text}
+
+Réponse :`;
 
   const response = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
