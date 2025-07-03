@@ -108,7 +108,7 @@ async function summarizeHistory(history: { role: string, content: string }[]): P
       'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
     },
     body: JSON.stringify({
-      model: 'gpt-4o-mini',
+      model: 'gpt-3.5-turbo',
       messages: [
         { role: 'system', content: 'Tu es un assistant IA qui résume des conversations pour garder le contexte.' },
         { role: 'user', content: prompt },
@@ -131,7 +131,7 @@ async function extractIntentAndEntities(message: string): Promise<{ intent?: str
       'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
     },
     body: JSON.stringify({
-      model: 'gpt-4o-mini',
+      model: 'gpt-3.5-turbo',
       messages: [
         { role: 'system', content: 'Tu es un assistant qui extrait l\'intention et les entités clés d\'un message utilisateur.' },
         { role: 'user', content: prompt },
@@ -168,7 +168,7 @@ async function generateSuggestions(context: string, lastReply: string, userMessa
       'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
     },
     body: JSON.stringify({
-      model: 'gpt-4o-mini',
+      model: 'gpt-3.5-turbo',
       messages: [
         { role: 'system', content: 'Tu es un assistant qui génère des suggestions proactives pour aider l\'utilisateur.' },
         { role: 'user', content: prompt },
@@ -465,7 +465,7 @@ export async function POST(req: Request) {
         'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
       },
       body: JSON.stringify({
-        model: 'gpt-4o-mini',
+        model: 'gpt-3.5-turbo',
         messages: openaiMessages,
         temperature: 0.7,
         max_tokens: 1000,

@@ -1,0 +1,170 @@
+[
+  {
+    "description": "Saturation en heures de pointe",
+    "criticite": "élevée",
+    "responsable": "Service exploitation SNCF",
+    "action": "Allongement des trains : Rames de 400 mètres"
+  },
+  {
+    "description": "Capacité maximale approchée",
+    "criticite": "moyenne",
+    "responsable": "Service infrastructure SNCF",
+    "action": "Optimisation des horaires : Intelligence artificielle"
+  },
+  {
+    "description": "Concurrence aérienne et routière",
+    "criticite": "moyenne",
+    "responsable": "Service commercial SNCF",
+    "action": "Maintien de la position de la SNCF"
+  },
+  {
+    "description": "Transition écologique",
+    "criticite": "élevée",
+    "responsable": "Service développement durable SNCF",
+    "action": "Objectif neutralité carbone pour 2030"
+  },
+  {
+    "description": "Rupture d'approvisionnement critique",
+    "criticite": "élevée",
+    "responsable": "Paul Richard",
+    "action": "Mise en place d'une procédure de vérification d'intégrité à l'expédition et d'emballage sécurisé"
+  },
+  {
+    "description": "Retard de 3 semaines sur la phase 1 d'installation",
+    "criticite": "élevée",
+    "responsable": "Jean Martin",
+    "action": "Replanifier les activités d'installation et ajuster le planning"
+  },
+  {
+    "description": "Coûts supplémentaires estimés : 280,000 €",
+    "criticite": "moyenne",
+    "responsable": "Sophie Bernard",
+    "action": "Évaluer les possibilités de réduction des coûts supplémentaires"
+  },
+  {
+    "description": "Vol durant transport de 420 eurobalises",
+    "criticite": "élevée",
+    "responsable": "LogiRail Express",
+    "action": "Renforcer les mesures de sécurité lors du transport et mettre en place une géolocalisation temps réel"
+  },
+  {
+    "description": "Retard global de 3 semaines sur la phase 1",
+    "criticite": "élevée",
+    "responsable": "Marie Lefebvre",
+    "action": "Parallélisation des phases 2 et 3"
+  },
+  {
+    "description": "Retard initial de 3 semaines rattrapé par optimisation",
+    "criticite": "moyenne",
+    "responsable": "Jean Martin",
+    "action": "Équipes renforcées, travail en 3x8, parallélisation des interventions, support technique renforcé"
+  },
+  {
+    "description": "Retard de livraison du matériel",
+    "criticite": "élevée",
+    "responsable": "Jean Martin",
+    "action": "Suivi régulier de l'avancement de la production et des livraisons"
+  },
+  {
+    "description": "Non-conformité aux normes de sécurité ferroviaire",
+    "criticite": "très élevée",
+    "responsable": "Thomas Moreau",
+    "action": "Renforcement des contrôles qualité et audits réguliers"
+  },
+  {
+    "description": "Indisponibilité du système supérieure à 0.5%",
+    "criticite": "moyenne",
+    "responsable": "Dr. François Lemoine",
+    "action": "Mise en place d'un plan de maintenance préventive renforcée"
+  },
+  {
+    "description": "Vol d'eurobalises programmables EB-PROG-450",
+    "criticite": "élevée",
+    "responsable": "Jean Martin",
+    "action": "Retard de 3 semaines sur la phase 1 d'installation"
+  },
+  {
+    "description": "Vol de 420 eurobalises d'une valeur de 1,47 M€ HT",
+    "criticite": "élevée",
+    "responsable": "Thomas Moreau",
+    "action": "Implications sécuritaires : risque de compromettre la sécurité du futur système ERTMS"
+  },
+  {
+    "description": "Impact financier estimé à 1,787 M€ HT",
+    "criticite": "élevée",
+    "responsable": "Sophie Bernard",
+    "action": "Dépasser la provision pour risques et puiser dans la réserve générale du projet"
+  },
+  {
+    "description": "Retard de 3 semaines sur la phase 1 d'installation",
+    "criticite": "élevée",
+    "responsable": "Marie Lefebvre",
+    "action": "Maintenir l'objectif de mise en service pour février 2027 malgré la réduction des marges"
+  },
+  {
+    "description": "Défaillance logistique dans la chaîne d'approvisionnement",
+    "criticite": "moyenne",
+    "responsable": "Paul Richard",
+    "action": "Renforcer les procédures de sécurité : changement de transporteur, GPS tracking, emballage sécurisé, escorte armée"
+  },
+  {
+    "description": "Responsabilité contractuelle limitée à 50 K€ par sinistre",
+    "criticite": "moyenne",
+    "responsable": "Catherine Blanc",
+    "action": "Engager une procédure d'expertise avec les assureurs pour récupérer le maximum de préjudices"
+  },
+  {
+    "description": "Failles dans l'approche de la sécurité logistique sur les grands projets",
+    "criticite": "élevée",
+    "responsable": "Jean-Claude Ministre",
+    "action": "Tirer des enseignements et recommandations pour renforcer la sécurité logistique"
+  },
+  {
+    "description": "Incompatibilité entre systèmes TVM existants et ERTMS",
+    "criticite": "élevé",
+    "responsable": "Marie Lefebvre",
+    "action": "Tests approfondis en laboratoire, période de transition avec exploitation parallèle"
+  },
+  {
+    "description": "Défaillance des nouveaux équipements",
+    "criticite": "moyen",
+    "responsable": "Jean Martin",
+    "action": "Redondance des systèmes critiques, maintenance préventive renforcée"
+  },
+  {
+    "description": "Retard d'approvisionnement équipements critiques",
+    "criticite": "élevé",
+    "responsable": "Alice Dupont",
+    "action": "Commandes anticipées, diversification fournisseurs, stocks de sécurité"
+  },
+  {
+    "description": "Perturbation importante du trafic",
+    "criticite": "élevé",
+    "responsable": "Thomas Moreau",
+    "action": "Travaux de nuit et week-ends, communication voyageurs renforcée, plans de transport adaptés"
+  },
+  {
+    "description": "Retard de livraison du matériel",
+    "criticite": "élevée",
+    "responsable": "Jean Dupont",
+    "action": "Relancer le fournisseur"
+  },
+  {
+    "description": "Difficultés liées aux travaux de nuit",
+    "criticite": "moyenne",
+    "responsable": "Marie Durand",
+    "action": "Mettre en place un planning précis et des équipes de nuit dédiées"
+  },
+  {
+    "description": "Retard d’approvisionnement",
+    "criticite": "Élevée",
+    "responsable": "Jean Martin",
+    "action": null
+  },
+  {
+    "description": "Opposition locale aux travaux",
+    "criticite": "Modérée",
+    "responsable": "Léa Morel",
+    "action": null
+  }
+]

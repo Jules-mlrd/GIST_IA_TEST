@@ -5,162 +5,292 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
-import { Mail, Phone, UserPlus, Search } from "lucide-react"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Mail, Phone, UserPlus, Trash2 } from "lucide-react"
+import { useEffect, useState } from "react"
 
-const teamMembers = [
-  {
-    name: "Marie Dubois",
-    role: "Chef de projet",
-    email: "m.dubois@sncf.fr",
-    phone: "01 23 45 67 89",
-    department: "Direction des Projets",
-    avatar: "MD",
-  },
-  {
-    name: "Jean Martin",
-    role: "Ingénieur technique",
-    email: "j.martin@sncf.fr",
-    phone: "01 23 45 67 90",
-    department: "Direction Technique",
-    avatar: "JM",
-  },
-  {
-    name: "Sophie Bernard",
-    role: "Responsable financier",
-    email: "s.bernard@sncf.fr",
-    phone: "01 23 45 67 91",
-    department: "Direction Financière",
-    avatar: "SB",
-  },
-  {
-    name: "Thomas Petit",
-    role: "Ingénieur sécurité",
-    email: "t.petit@sncf.fr",
-    phone: "01 23 45 67 92",
-    department: "Direction Sécurité",
-    avatar: "TP",
-  },
-  {
-    name: "Claire Moreau",
-    role: "Responsable communication",
-    email: "c.moreau@sncf.fr",
-    phone: "01 23 45 67 93",
-    department: "Direction Communication",
-    avatar: "CM",
-  },
-]
+function isInternal(email?: string) {
+  return email && email.endsWith("@sncf.fr")
+}
 
-const externalContacts = [
-  {
-    name: "Philippe Durand",
-    company: "Fournisseur A",
-    role: "Responsable commercial",
-    email: "p.durand@fournisseura.com",
-    phone: "01 98 76 54 32",
-    avatar: "PD",
-  },
-  {
-    name: "Isabelle Leroy",
-    company: "Consultant B",
-    role: "Consultante senior",
-    email: "i.leroy@consultantb.com",
-    phone: "01 98 76 54 33",
-    avatar: "IL",
-  },
-]
+function getFullName(contact: any) {
+  if (contact.prenom || contact.nom) {
+    return [contact.prenom, contact.nom].filter(Boolean).join(" ")
+  }
+  return contact.name || "Nom inconnu"
+}
+
+const emptyContact = { prenom: "", nom: "", email: "", telephone: "", societe: "", role: "" }
+
+const CACHE_KEY = 'contacts_cache_v1';
+const CACHE_EXPIRATION_MS = 10 * 60 * 1000; // 10 minutes
 
 export default function ContactsPage() {
+  const [contacts, setContacts] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [search, setSearch] = useState("")
+  const [showForm, setShowForm] = useState(false)
+  const [form, setForm] = useState({ ...emptyContact })
+  const [formError, setFormError] = useState<string | null>(null)
+  const [formLoading, setFormLoading] = useState(false)
+  const [deleteLoading, setDeleteLoading] = useState<string | null>(null)
+
+  const fetchContacts = async () => {
+    setLoading(true)
+    setError(null)
+    try {
+      // Vérifier le cache localStorage
+      const cached = typeof window !== 'undefined' ? localStorage.getItem(CACHE_KEY) : null;
+      if (cached) {
+        const { contacts: cachedContacts, timestamp } = JSON.parse(cached);
+        if (Date.now() - timestamp < CACHE_EXPIRATION_MS) {
+          setContacts(cachedContacts || []);
+          setLoading(false);
+          return;
+        }
+      }
+      // Sinon, appel API
+      const res = await fetch("/api/contacts")
+      if (!res.ok) throw new Error("Erreur lors de la récupération des contacts")
+      const data = await res.json()
+      setContacts(data.contacts || [])
+      // Mettre à jour le cache
+      if (typeof window !== 'undefined') {
+        localStorage.setItem(CACHE_KEY, JSON.stringify({ contacts: data.contacts || [], timestamp: Date.now() }))
+      }
+    } catch (e: any) {
+      setError(e.message)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    fetchContacts()
+  }, [])
+
+  // Filtrage par recherche
+  const filteredContacts = contacts.filter(contact => {
+    const q = search.toLowerCase()
+    return (
+      getFullName(contact).toLowerCase().includes(q) ||
+      (contact.email && contact.email.toLowerCase().includes(q)) ||
+      (contact.telephone && contact.telephone.toLowerCase().includes(q)) ||
+      (contact.societe && contact.societe.toLowerCase().includes(q)) ||
+      (contact.role && contact.role.toLowerCase().includes(q))
+    )
+  })
+
+  const internalContacts = filteredContacts.filter(c => isInternal(c.email))
+  const externalContacts = filteredContacts.filter(c => !isInternal(c.email))
+
+  const handleFormChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setForm({ ...form, [e.target.name]: e.target.value })
+  }
+
+  const handleAddContact = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setFormError(null)
+    if (!form.email && !form.telephone) {
+      setFormError("Email ou téléphone requis.")
+      return
+    }
+    setFormLoading(true)
+    try {
+      const res = await fetch("/api/contacts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(form)
+      })
+      if (!res.ok) {
+        const data = await res.json()
+        setFormError(data.error || "Erreur lors de l'ajout")
+      } else {
+        setShowForm(false)
+        setForm({ ...emptyContact })
+        await fetchContacts()
+      }
+    } catch {
+      setFormError("Erreur lors de l'ajout")
+    } finally {
+      setFormLoading(false)
+    }
+  }
+
+  const handleDeleteContact = async (contact: any) => {
+    setDeleteLoading((contact.email || contact.telephone) ?? '')
+    try {
+      const res = await fetch('/api/contacts', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: contact.email, telephone: contact.telephone })
+      })
+      await fetchContacts()
+    } finally {
+      setDeleteLoading(null)
+    }
+  }
+
+  // Pour savoir si un contact est manuel (issu du JSON)
+  function isManualContact(contact: any) {
+    // Un contact manuel n'est pas extrait par l'IA, donc il n'a pas de champ "extrait" ou on peut marquer les contacts IA si besoin
+    // Ici, on considère qu'un contact est manuel s'il n'est pas dans la liste des contacts IA (mais pour l'instant, on ne marque pas, donc on autorise la suppression sur tous les contacts)
+    // Pour être plus strict, il faudrait marquer les contacts IA lors du GET
+    // Ici, on autorise la suppression sur tous les contacts qui ne sont pas extraits à chaque GET (donc ceux du JSON)
+    // Pour l'instant, on va autoriser la suppression sur tous les contacts, mais tu peux affiner si besoin
+    return true
+  }
+
   return (
-    <Layout title="Contacts" subtitle="Équipe projet et contacts externes">
-      <div className="flex justify-end items-center mb-4">
-        <Button className="bg-sncf-red hover:bg-red-700">
+    <Layout title="Contacts" subtitle="Contacts extraits automatiquement des documents du projet">
+      <div className="mb-4 flex flex-col md:flex-row md:items-center md:justify-between gap-2">
+        <Button className="bg-sncf-red hover:bg-red-700" onClick={() => setShowForm(v => !v)}>
           <UserPlus className="mr-2 h-4 w-4" />
           Ajouter un contact
         </Button>
+        <Input
+          type="text"
+          placeholder="Rechercher un contact..."
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          className="max-w-xs"
+        />
       </div>
-
-      <Tabs defaultValue="team" className="w-full">
-        <TabsList>
-          <TabsTrigger value="team">Équipe projet</TabsTrigger>
-          <TabsTrigger value="external">Contacts externes</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="team" className="mt-4">
+      {showForm && (
+        <form onSubmit={handleAddContact} className="mb-6 p-4 border rounded bg-gray-50 flex flex-col gap-2 max-w-xl">
+          <div className="flex gap-2">
+            <Input name="prenom" placeholder="Prénom" value={form.prenom} onChange={handleFormChange} />
+            <Input name="nom" placeholder="Nom" value={form.nom} onChange={handleFormChange} />
+          </div>
+          <div className="flex gap-2">
+            <Input name="email" placeholder="Email" value={form.email} onChange={handleFormChange} type="email" />
+            <Input name="telephone" placeholder="Téléphone" value={form.telephone} onChange={handleFormChange} />
+          </div>
+          <div className="flex gap-2">
+            <Input name="societe" placeholder="Société" value={form.societe} onChange={handleFormChange} />
+            <Input name="role" placeholder="Rôle" value={form.role} onChange={handleFormChange} />
+          </div>
+          {formError && <div className="text-red-600 text-sm">{formError}</div>}
+          <div className="flex gap-2 mt-2">
+            <Button type="submit" className="bg-sncf-red" disabled={formLoading}>
+              {formLoading ? "Ajout..." : "Ajouter"}
+            </Button>
+            <Button type="button" variant="outline" onClick={() => setShowForm(false)} disabled={formLoading}>
+              Annuler
+            </Button>
+          </div>
+        </form>
+      )}
+      {loading && <div>Chargement des contacts...</div>}
+      {error && <div className="text-red-600">{error}</div>}
+      {!loading && !error && (
+        <>
+          <h2 className="text-lg font-semibold mb-2 mt-4">Équipe projet (SNCF)</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {teamMembers.map((member, index) => (
+            {internalContacts.length === 0 && <div>Aucun contact interne trouvé.</div>}
+            {internalContacts.map((contact, index) => (
               <Card key={index}>
                 <CardContent className="p-6">
                   <div className="flex items-start gap-4">
                     <Avatar className="h-12 w-12">
-                      <AvatarFallback className="bg-sncf-red text-white">{member.avatar}</AvatarFallback>
+                      <AvatarFallback className="bg-sncf-red text-white">
+                        {getFullName(contact).split(" ").map((n: string) => n[0]).join("") || "?"}
+                      </AvatarFallback>
                     </Avatar>
                     <div className="flex-1">
-                      <h3 className="font-medium text-gray-900">{member.name}</h3>
-                      <p className="text-sm text-gray-500">{member.role}</p>
-                      <Badge variant="outline" className="mt-1">
-                        {member.department}
-                      </Badge>
+                      <h3 className="font-medium text-gray-900">{getFullName(contact)}</h3>
+                      {contact.role && <div className="text-sm text-gray-500">{contact.role}</div>}
+                      {contact.societe && <div className="text-xs text-gray-400">{contact.societe}</div>}
                       <div className="mt-3 space-y-1">
-                        <div className="flex items-center text-sm">
-                          <Mail className="h-3.5 w-3.5 mr-2 text-gray-500" />
-                          <a href={`mailto:${member.email}`} className="text-gray-600 hover:text-sncf-red">
-                            {member.email}
-                          </a>
-                        </div>
-                        <div className="flex items-center text-sm">
-                          <Phone className="h-3.5 w-3.5 mr-2 text-gray-500" />
-                          <a href={`tel:${member.phone}`} className="text-gray-600 hover:text-sncf-red">
-                            {member.phone}
-                          </a>
-                        </div>
+                        {contact.email && (
+                          <div className="flex items-center text-sm">
+                            <Mail className="h-3.5 w-3.5 mr-2 text-gray-500" />
+                            <a href={`mailto:${contact.email}`} className="text-gray-600 hover:text-sncf-red">
+                              {contact.email}
+                            </a>
+                          </div>
+                        )}
+                        {contact.telephone && (
+                          <div className="flex items-center text-sm">
+                            <Phone className="h-3.5 w-3.5 mr-2 text-gray-500" />
+                            <a href={`tel:${contact.telephone}`} className="text-gray-600 hover:text-sncf-red">
+                              {contact.telephone}
+                            </a>
+                          </div>
+                        )}
                       </div>
+                      {isManualContact(contact) && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="text-red-600 hover:bg-red-100 ml-auto mt-2"
+                          onClick={() => handleDeleteContact(contact)}
+                          disabled={deleteLoading === (contact.email || contact.telephone)}
+                          title="Supprimer le contact"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      )}
                     </div>
                   </div>
                 </CardContent>
               </Card>
             ))}
           </div>
-        </TabsContent>
-
-        <TabsContent value="external" className="mt-4">
+          <h2 className="text-lg font-semibold mb-2 mt-8">Contacts externes</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {externalContacts.length === 0 && <div>Aucun contact externe trouvé.</div>}
             {externalContacts.map((contact, index) => (
               <Card key={index}>
                 <CardContent className="p-6">
                   <div className="flex items-start gap-4">
                     <Avatar className="h-12 w-12">
-                      <AvatarFallback className="bg-gray-200 text-gray-700">{contact.avatar}</AvatarFallback>
+                      <AvatarFallback className="bg-gray-200 text-gray-700">
+                        {getFullName(contact).split(" ").map((n: string) => n[0]).join("") || "?"}
+                      </AvatarFallback>
                     </Avatar>
                     <div className="flex-1">
-                      <h3 className="font-medium text-gray-900">{contact.name}</h3>
-                      <p className="text-sm text-gray-500">{contact.role}</p>
-                      <Badge variant="secondary" className="mt-1">
-                        {contact.company}
-                      </Badge>
+                      <h3 className="font-medium text-gray-900">{getFullName(contact)}</h3>
+                      {contact.role && <div className="text-sm text-gray-500">{contact.role}</div>}
+                      {contact.societe && <div className="text-xs text-gray-400">{contact.societe}</div>}
                       <div className="mt-3 space-y-1">
-                        <div className="flex items-center text-sm">
-                          <Mail className="h-3.5 w-3.5 mr-2 text-gray-500" />
-                          <a href={`mailto:${contact.email}`} className="text-gray-600 hover:text-sncf-red">
-                            {contact.email}
-                          </a>
-                        </div>
-                        <div className="flex items-center text-sm">
-                          <Phone className="h-3.5 w-3.5 mr-2 text-gray-500" />
-                          <a href={`tel:${contact.phone}`} className="text-gray-600 hover:text-sncf-red">
-                            {contact.phone}
-                          </a>
-                        </div>
+                        {contact.email && (
+                          <div className="flex items-center text-sm">
+                            <Mail className="h-3.5 w-3.5 mr-2 text-gray-500" />
+                            <a href={`mailto:${contact.email}`} className="text-gray-600 hover:text-sncf-red">
+                              {contact.email}
+                            </a>
+                          </div>
+                        )}
+                        {contact.telephone && (
+                          <div className="flex items-center text-sm">
+                            <Phone className="h-3.5 w-3.5 mr-2 text-gray-500" />
+                            <a href={`tel:${contact.telephone}`} className="text-gray-600 hover:text-sncf-red">
+                              {contact.telephone}
+                            </a>
+                          </div>
+                        )}
                       </div>
+                      {isManualContact(contact) && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="text-red-600 hover:bg-red-100 ml-auto mt-2"
+                          onClick={() => handleDeleteContact(contact)}
+                          disabled={deleteLoading === (contact.email || contact.telephone)}
+                          title="Supprimer le contact"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      )}
                     </div>
                   </div>
                 </CardContent>
               </Card>
             ))}
           </div>
-        </TabsContent>
-      </Tabs>
+        </>
+      )}
     </Layout>
   )
 }

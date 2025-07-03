@@ -4,170 +4,242 @@ import { Layout } from "@/components/layout"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { AlertTriangle, PlusCircle, ArrowUpDown, Calendar } from "lucide-react"
+import { AlertTriangle, PlusCircle, ArrowUpDown, Calendar, Trash2 } from "lucide-react"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Progress } from "@/components/ui/progress"
+import { useEffect, useState } from "react"
 
-const risks = [
-  {
-    id: 1,
-    title: "Retard livraison matériel",
-    description:
-      "Le fournisseur principal a signalé des problèmes de production qui pourraient retarder la livraison du matériel nécessaire.",
-    severity: "high",
-    impact: "Délai +2 semaines",
-    probability: 70,
-    owner: "Jean Martin",
-    status: "open",
-    mitigation: "Contacter des fournisseurs alternatifs et préparer un plan de secours.",
-    dateIdentified: "01 Mar 2024",
-  },
-  {
-    id: 2,
-    title: "Ressources techniques limitées",
-    description: "L'équipe technique est actuellement en sous-effectif pour gérer la charge de travail prévue.",
-    severity: "medium",
-    impact: "Budget +5%",
-    probability: 50,
-    owner: "Marie Dubois",
-    status: "mitigating",
-    mitigation: "Recruter des ressources temporaires ou réaffecter des ressources d'autres projets.",
-    dateIdentified: "15 Feb 2024",
-  },
-  {
-    id: 3,
-    title: "Validation réglementaire",
-    description: "Le processus de validation réglementaire pourrait prendre plus de temps que prévu.",
-    severity: "low",
-    impact: "Délai +3 jours",
-    probability: 30,
-    owner: "Thomas Petit",
-    status: "closed",
-    mitigation:
-      "Préparer tous les documents nécessaires à l'avance et maintenir une communication régulière avec les autorités.",
-    dateIdentified: "10 Feb 2024",
-  },
-  {
-    id: 4,
-    title: "Dépassement budgétaire",
-    description: "Les coûts des matériaux ont augmenté de 8% depuis l'estimation initiale.",
-    severity: "medium",
-    impact: "Budget +8%",
-    probability: 60,
-    owner: "Sophie Bernard",
-    status: "open",
-    mitigation: "Réviser le budget et identifier les postes où des économies peuvent être réalisées.",
-    dateIdentified: "05 Mar 2024",
-  },
-  {
-    id: 5,
-    title: "Résistance au changement",
-    description: "Les utilisateurs finaux pourraient résister à l'adoption des nouveaux processus.",
-    severity: "low",
-    impact: "Efficacité -10%",
-    probability: 40,
-    owner: "Claire Moreau",
-    status: "mitigating",
-    mitigation: "Mettre en place un plan de communication et de formation pour faciliter la transition.",
-    dateIdentified: "20 Feb 2024",
-  },
-]
+const RISKS_CACHE_KEY = 'risks_cache_v1';
+const RISKS_CACHE_EXPIRATION_MS = 10 * 60 * 1000; // 10 minutes
 
 export default function RisksPage() {
+  const [risks, setRisks] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [showForm, setShowForm] = useState(false)
+  const [form, setForm] = useState({ description: "", criticite: "", responsable: "", action: "" })
+  const [formError, setFormError] = useState<string | null>(null)
+  const [formLoading, setFormLoading] = useState(false)
+  const [deleteLoading, setDeleteLoading] = useState<string | null>(null)
+  const [refreshing, setRefreshing] = useState(false)
+
+  const fetchRisks = async () => {
+    setLoading(true)
+    setError(null)
+    try {
+      // Vérifier le cache localStorage
+      const cached = typeof window !== 'undefined' ? localStorage.getItem(RISKS_CACHE_KEY) : null;
+      if (cached) {
+        const { risks: cachedRisks, timestamp } = JSON.parse(cached);
+        if (Date.now() - timestamp < RISKS_CACHE_EXPIRATION_MS) {
+          setRisks(cachedRisks || []);
+          setLoading(false);
+          return;
+        }
+      }
+      // Sinon, appel API
+      const res = await fetch("/api/risks")
+      if (!res.ok) throw new Error("Erreur lors de la récupération des risques")
+      const data = await res.json()
+      setRisks(data.risks || [])
+      // Mettre à jour le cache
+      if (typeof window !== 'undefined') {
+        localStorage.setItem(RISKS_CACHE_KEY, JSON.stringify({ risks: data.risks || [], timestamp: Date.now() }))
+      }
+    } catch (e: any) {
+      setError(e.message)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    fetchRisks()
+  }, [])
+
+  // Mapping pour affichage (fallback si champ manquant)
+  function getSeverity(criticite?: string) {
+    if (!criticite) return 'secondary'
+    if (/élevée|high/i.test(criticite)) return 'destructive'
+    if (/moyenne|medium/i.test(criticite)) return 'default'
+    return 'secondary'
+  }
+
+  function getSeverityColor(criticite?: string) {
+    if (!criticite) return { variant: "secondary", className: "" };
+    if (/critique|extrême|extreme|critical/i.test(criticite)) return { variant: "destructive", className: "" }; // Rouge
+    if (/élevée|haute|high/i.test(criticite)) return { variant: "default", className: "bg-orange-400 text-white" }; // Orange
+    if (/moyenne|medium/i.test(criticite)) return { variant: "default", className: "bg-yellow-300 text-gray-900" }; // Jaune
+    if (/faible|low/i.test(criticite)) return { variant: "default", className: "bg-green-500 text-white" }; // Vert
+    return { variant: "secondary", className: "" };
+  }
+
+  const handleFormChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setForm({ ...form, [e.target.name]: e.target.value })
+  }
+
+  const handleAddRisk = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setFormError(null)
+    if (!form.description) {
+      setFormError("Description requise.")
+      return
+    }
+    setFormLoading(true)
+    try {
+      const res = await fetch("/api/risks", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(form)
+      })
+      if (!res.ok) {
+        const data = await res.json()
+        setFormError(data.error || "Erreur lors de l'ajout")
+      } else {
+        setShowForm(false)
+        setForm({ description: "", criticite: "", responsable: "", action: "" })
+        await fetchRisks()
+      }
+    } catch {
+      setFormError("Erreur lors de l'ajout")
+    } finally {
+      setFormLoading(false)
+    }
+  }
+
+  const handleDeleteRisk = async (risk: any) => {
+    setDeleteLoading(risk.id || risk.description)
+    try {
+      const res = await fetch('/api/risks', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: risk.id, description: risk.description })
+      })
+      await fetchRisks()
+    } finally {
+      setDeleteLoading(null)
+    }
+  }
+
+  const handleRefreshIA = async () => {
+    setRefreshing(true)
+    try {
+      await fetch('/api/risks/refresh', { method: 'POST' })
+      await fetchRisks()
+    } finally {
+      setRefreshing(false)
+    }
+  }
+
+  // Un risque manuel a un id (ajouté via POST)
+  function isManualRisk(risk: any) {
+    return !!risk.id
+  }
+
   return (
     <Layout title="Risques" subtitle="Gestion des risques du projet">
       <div className="flex justify-between items-center mb-4">
         <div className="flex items-center gap-2">
           <Badge variant="destructive" className="rounded-sm">
-            {risks.filter((risk) => risk.status === "open").length} Risques actifs
+            {risks.filter((risk) => (risk.status || '').toLowerCase() === "open" || (risk.criticite || '').toLowerCase() === "élevée").length} Risques actifs
           </Badge>
           <Badge variant="outline" className="rounded-sm">
-            {risks.filter((risk) => risk.status === "mitigating").length} En atténuation
+            {risks.filter((risk) => (risk.status || '').toLowerCase() === "mitigating" || (risk.criticite || '').toLowerCase() === "moyenne").length} En atténuation
           </Badge>
           <Badge variant="secondary" className="rounded-sm">
-            {risks.filter((risk) => risk.status === "closed").length} Résolus
+            {risks.filter((risk) => (risk.status || '').toLowerCase() === "closed" || (risk.criticite || '').toLowerCase() === "faible").length} Résolus
           </Badge>
         </div>
-        <Button className="bg-sncf-red hover:bg-red-700">
-          <PlusCircle className="mr-2 h-4 w-4" />
-          Ajouter un risque
-        </Button>
+        <div className="flex gap-2">
+          <Button className="bg-sncf-red hover:bg-red-700" onClick={() => setShowForm(v => !v)}>
+            <PlusCircle className="mr-2 h-4 w-4" />
+            Ajouter un risque
+          </Button>
+          <Button variant="outline" onClick={handleRefreshIA} disabled={refreshing}>
+            {refreshing ? "Rafraîchissement..." : "Rafraîchir IA"}
+          </Button>
+        </div>
       </div>
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <AlertTriangle className="h-5 w-5 text-sncf-red" />
-            Registre des risques
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="w-[50px]">ID</TableHead>
-                <TableHead>Titre</TableHead>
-                <TableHead>Sévérité</TableHead>
-                <TableHead>
-                  <div className="flex items-center">
-                    Probabilité
-                    <ArrowUpDown className="ml-2 h-4 w-4" />
-                  </div>
-                </TableHead>
-                <TableHead>Impact</TableHead>
-                <TableHead>Responsable</TableHead>
-                <TableHead>Statut</TableHead>
-                <TableHead>
-                  <div className="flex items-center">
-                    Date
-                    <Calendar className="ml-2 h-4 w-4" />
-                  </div>
-                </TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {risks.map((risk) => (
-                <TableRow key={risk.id}>
-                  <TableCell className="font-medium">{risk.id}</TableCell>
-                  <TableCell>
-                    <div>
-                      <div className="font-medium">{risk.title}</div>
-                      <div className="text-sm text-gray-500 truncate max-w-xs">{risk.description}</div>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <Badge
-                      variant={
-                        risk.severity === "high" ? "destructive" : risk.severity === "medium" ? "default" : "secondary"
-                      }
-                    >
-                      {risk.severity === "high" ? "Élevé" : risk.severity === "medium" ? "Moyen" : "Faible"}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-2">
-                      <Progress value={risk.probability} className="h-2 w-16" />
-                      <span className="text-sm">{risk.probability}%</span>
-                    </div>
-                  </TableCell>
-                  <TableCell>{risk.impact}</TableCell>
-                  <TableCell>{risk.owner}</TableCell>
-                  <TableCell>
-                    <Badge
-                      variant={
-                        risk.status === "open" ? "destructive" : risk.status === "mitigating" ? "outline" : "secondary"
-                      }
-                    >
-                      {risk.status === "open" ? "Actif" : risk.status === "mitigating" ? "En atténuation" : "Résolu"}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>{risk.dateIdentified}</TableCell>
+      {showForm && (
+        <form onSubmit={handleAddRisk} className="mb-6 p-4 border rounded bg-gray-50 flex flex-col gap-2 max-w-xl">
+          <div className="flex gap-2">
+            <input name="description" placeholder="Description" value={form.description} onChange={handleFormChange} className="flex-1 border rounded px-2 py-1" />
+            <input name="criticite" placeholder="Criticité" value={form.criticite} onChange={handleFormChange} className="flex-1 border rounded px-2 py-1" />
+          </div>
+          <div className="flex gap-2">
+            <input name="responsable" placeholder="Responsable" value={form.responsable} onChange={handleFormChange} className="flex-1 border rounded px-2 py-1" />
+            <input name="action" placeholder="Action" value={form.action} onChange={handleFormChange} className="flex-1 border rounded px-2 py-1" />
+          </div>
+          {formError && <div className="text-red-600 text-sm">{formError}</div>}
+          <div className="flex gap-2 mt-2">
+            <Button type="submit" className="bg-sncf-red" disabled={formLoading}>
+              {formLoading ? "Ajout..." : "Ajouter"}
+            </Button>
+            <Button type="button" variant="outline" onClick={() => setShowForm(false)} disabled={formLoading}>
+              Annuler
+            </Button>
+          </div>
+        </form>
+      )}
+      {loading && <div>Chargement des risques...</div>}
+      {error && <div className="text-red-600">{error}</div>}
+      {!loading && !error && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-sncf-red" />
+              Registre des risques
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-[50px]">#</TableHead>
+                  <TableHead>Description</TableHead>
+                  <TableHead>Criticité</TableHead>
+                  <TableHead>Responsable</TableHead>
+                  <TableHead>Action</TableHead>
+                  <TableHead></TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+              </TableHeader>
+              <TableBody>
+                {risks.length === 0 && (
+                  <TableRow><TableCell colSpan={6}>Aucun risque trouvé dans les documents.</TableCell></TableRow>
+                )}
+                {risks.map((risk, idx) => {
+                  const sev = getSeverityColor(risk.criticite);
+                  return (
+                    <TableRow key={risk.id || idx}>
+                      <TableCell className="font-medium">{idx + 1}</TableCell>
+                      <TableCell>{risk.description || "-"}</TableCell>
+                      <TableCell>
+                        <Badge variant={sev.variant as 'default' | 'destructive' | 'secondary' | 'outline'} className={sev.className}>{risk.criticite || "-"}</Badge>
+                      </TableCell>
+                      <TableCell>{risk.responsable || "-"}</TableCell>
+                      <TableCell>{risk.action || "-"}</TableCell>
+                      <TableCell>
+                        {isManualRisk(risk) && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="text-red-600 hover:bg-red-100"
+                            onClick={() => handleDeleteRisk(risk)}
+                            disabled={deleteLoading === (risk.id || risk.description)}
+                            title="Supprimer le risque"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      )}
     </Layout>
   )
 }

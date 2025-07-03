@@ -118,6 +118,9 @@ function fixEncoding(str: string) {
     .replace(/Ã§/g, 'ç');
 }
 
+const DECLARATION_CACHE_KEY = 'declaration_affaire_cache_v1';
+const DECLARATION_CACHE_EXPIRATION_MS = 10 * 60 * 1000; // 10 minutes
+
 export default function DeclarationAffairePage() {
   // S3
   const [s3Files, setS3Files] = useState<S3Document[]>([]);
@@ -143,6 +146,9 @@ export default function DeclarationAffairePage() {
   // Ajout d'un état pour le feedback de fusion IA
   const [fusionNotice, setFusionNotice] = useState("");
 
+  // Ajout d'un état pour le reset
+  const [resetting, setResetting] = useState(false);
+
   // Chargement fichiers S3
   useEffect(() => {
     setLoadingS3(true);
@@ -167,7 +173,38 @@ export default function DeclarationAffairePage() {
     if (e.target.files) setFiles(Array.from(e.target.files));
   };
 
-  // Analyse IA (appel réel backend)
+  // Fonction pour charger depuis le cache ou l'API
+  const fetchDeclaration = async (keys: string[], currentFields: any) => {
+    // Vérifier le cache localStorage
+    const cacheKey = DECLARATION_CACHE_KEY + '_' + (keys.sort().join(','));
+    const cached = typeof window !== 'undefined' ? localStorage.getItem(cacheKey) : null;
+    if (cached) {
+      const { data, timestamp } = JSON.parse(cached);
+      if (Date.now() - timestamp < DECLARATION_CACHE_EXPIRATION_MS) {
+        setFields((prev) => ({ ...prev, ...mapAIToFields(data) }));
+        return true;
+      }
+    }
+    // Sinon, appel API
+    const res = await fetch("/api/declaration-affaire", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ keys, currentFields }),
+    });
+    const data = await res.json();
+    if (!res.ok || data.error) {
+      setAnalyzeError(data.error || "Erreur lors de l'analyse IA");
+      return false;
+    } else {
+      setFields((prev) => ({ ...prev, ...mapAIToFields(data) }));
+      if (typeof window !== 'undefined') {
+        localStorage.setItem(cacheKey, JSON.stringify({ data, timestamp: Date.now() }));
+      }
+      return true;
+    }
+  };
+
+  // Remplacer handleAnalyze pour utiliser le cache
   const handleAnalyze = async () => {
     setAnalyzing(true);
     setAnalyzeError("");
@@ -186,30 +223,30 @@ export default function DeclarationAffairePage() {
         setAnalyzing(false);
         return;
       }
-      // Appel API
-      const res = await fetch("/api/declaration-affaire", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ keys, currentFields: fields }),
-      });
-      // Gestion du feedback de résumé IA
-      if (res.headers.get("x-summarization-notice")) {
-        setSummarizationNotice(res.headers.get("x-summarization-notice")!);
-      }
-      // Gestion du feedback de fusion IA
-      if (res.headers.get("x-fusion-notice")) {
-        setFusionNotice(res.headers.get("x-fusion-notice")!);
-      }
-      const data = await res.json();
-      if (!res.ok || data.error) {
-        setAnalyzeError(data.error || "Erreur lors de l'analyse IA");
-      } else {
-        setFields((prev) => ({ ...prev, ...mapAIToFields(data) }));
-      }
+      await fetchDeclaration(keys, fields);
     } catch (e: any) {
       setAnalyzeError(e?.message || "Erreur inattendue");
     } finally {
       setAnalyzing(false);
+    }
+  };
+
+  // Bouton pour reset le cache
+  const handleResetCache = () => {
+    setResetting(true);
+    try {
+      if (typeof window !== 'undefined') {
+        // Supprimer toutes les entrées de cache déclaration d'affaire
+        Object.keys(localStorage).forEach(key => {
+          if (key.startsWith(DECLARATION_CACHE_KEY)) {
+            localStorage.removeItem(key);
+          }
+        });
+      }
+      // Réinitialiser le formulaire
+      setFields(defaultFields);
+    } finally {
+      setResetting(false);
     }
   };
 
@@ -302,9 +339,14 @@ export default function DeclarationAffairePage() {
 
         {/* Section 3 : Analyse IA */}
         <section className="bg-white border rounded-lg p-4 shadow-sm flex flex-col gap-2">
-          <Button onClick={handleAnalyze} disabled={analyzing || (selectedS3Keys.length === 0 && files.length === 0)}>
-            {analyzing ? "Analyse en cours..." : "Analyser avec l'IA"}
-          </Button>
+          <div className="flex gap-2 mb-4">
+            <Button onClick={handleAnalyze} disabled={analyzing || (selectedS3Keys.length === 0 && files.length === 0)}>
+              {analyzing ? "Analyse en cours..." : "Analyser avec l'IA"}
+            </Button>
+            <Button onClick={handleResetCache} variant="outline" disabled={resetting}>
+              {resetting ? "Reset..." : "Reset cache"}
+            </Button>
+          </div>
           {analyzeError && <div className="text-red-500">{analyzeError}</div>}
         </section>
 
