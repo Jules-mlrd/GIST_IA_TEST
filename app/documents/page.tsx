@@ -207,7 +207,7 @@ export default function DocumentsPage() {
           <div className="flex flex-col items-end">
             <input
               type="file"
-              accept=".pdf,.txt,.doc,.docx,.xls,.xlsx,.ppt,.pptx"
+              accept=".pdf,.txt,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.html"
               multiple
               ref={fileInputRef}
               style={{ display: 'none' }}

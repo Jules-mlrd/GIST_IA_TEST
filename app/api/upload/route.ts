@@ -13,7 +13,7 @@ export async function POST(req: Request) {
 
   const uploaded: { fileName: string, url?: string, error?: string }[] = [];
   for (const file of files) {
-    const allowedTypes = ["application/pdf", "text/plain", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "application/vnd.ms-excel", "text/csv", "application/msword", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"];
+    const allowedTypes = ["application/pdf", "text/plain", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "application/vnd.ms-excel", "text/csv", "application/msword", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "text/html"];
     if (!allowedTypes.includes(file.type)) {
       uploaded.push({ fileName: file.name, error: "Type de fichier non supporté" });
       continue;

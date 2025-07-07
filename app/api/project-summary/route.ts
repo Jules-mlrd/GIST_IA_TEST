@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server"
 import { listPdfFilesInS3, fetchPdfTextFromS3 } from "@/lib/readPdf"
-import { listTxtFilesInS3, fetchTxtContentFromS3 } from "@/lib/readTxt"
+import { listTxtFilesInS3, fetchTxtContentFromS3, fetchHtmlTextFromS3 } from "@/lib/readTxt"
 
 const BUCKET_NAME = "gism-documents"
-const SUPPORTED_EXTENSIONS = ['.pdf', '.txt']
+const SUPPORTED_EXTENSIONS = ['.pdf', '.txt', '.html']
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY
 const OPENAI_API_URL = "https://api.openai.com/v1/chat/completions"
 
@@ -105,6 +105,8 @@ export async function GET(req: NextRequest) {
           text = await fetchPdfTextFromS3(BUCKET_NAME, file)
         } else if (ext === '.txt') {
           text = await fetchTxtContentFromS3(BUCKET_NAME, file)
+        } else if (ext === '.html') {
+          text = await fetchHtmlTextFromS3(BUCKET_NAME, file)
         }
       } catch (e: any) {
         results.push({ file, error: `Erreur lors de la lecture du fichier: ${e.message || e.toString()}` })

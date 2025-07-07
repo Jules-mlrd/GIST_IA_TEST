@@ -5,6 +5,7 @@ import pdfParse from "pdf-parse"
 import OpenAI from "openai"
 import path from "path"
 import { readPdfFromS3Robust } from "@/lib/readPdfRobust"
+import { fetchHtmlTextFromS3 } from "@/lib/readTxt"
 
 
 async function getS3FileBuffer(key: string): Promise<Buffer> {
@@ -36,6 +37,10 @@ async function readPdfFromS3(key: string) {
 
 async function readDocxFromS3(key: string) {
   return "[Lecture DOCX non implémentée dans cette démo]"
+}
+
+async function readHtmlFromS3(key: string) {
+  return await fetchHtmlTextFromS3(process.env.AWS_BUCKET_NAME!, key);
 }
 
 async function askOpenAI(prompt: string, maxRetries = 2): Promise<string> {
@@ -93,6 +98,7 @@ function truncateText(text: string, max: number = 8000) {
 const FILE_HANDLERS: Record<string, (key: string) => Promise<string | Buffer>> = {
   pdf: readPdfFromS3,
   txt: readTxtFromS3,
+  html: readHtmlFromS3,
   docx: readDocxFromS3,
   doc: readDocxFromS3,
 }
