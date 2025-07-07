@@ -82,7 +82,6 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center p-4">
       <div className="w-full max-w-6xl grid grid-cols-1 lg:grid-cols-2 gap-8 items-center">
-        {/* Left side - Branding and Information */}
         <div className="space-y-8">
           <div className="text-center lg:text-left">
             <div className="flex items-center justify-center lg:justify-start gap-3 mb-6">
@@ -142,7 +141,6 @@ export default function LoginPage() {
               </div>
             </div>
 
-            {/* Animated AI Processing Indicator */}
             <div className="flex items-center justify-center lg:justify-start gap-2 text-sm text-gray-500">
               <div className="flex items-center gap-1">
                 <div className="w-2 h-2 bg-gist-blue rounded-full animate-pulse"></div>
@@ -160,7 +158,6 @@ export default function LoginPage() {
           </div>
         </div>
 
-        {/* Right side - Login Forms */}
         <div className="flex justify-center">
           <Card className="w-full max-w-md shadow-xl border-0">
             <CardHeader className="text-center pb-2">
@@ -184,7 +181,6 @@ export default function LoginPage() {
                   </TabsTrigger>
                 </TabsList>
 
-                {/* Client Login Form */}
                 <TabsContent value="client">
                   <div className="bg-blue-50 p-3 rounded-lg mb-4">
                     <p className="text-sm text-blue-700">Accès direct au projet "Ligne à grande vitesse Lyon–Paris".</p>
@@ -247,7 +243,6 @@ export default function LoginPage() {
                   </form>
                 </TabsContent>
 
-                {/* Collaborator Login Form */}
                 <TabsContent value="collaborator">
                   <div className="bg-green-50 p-3 rounded-lg mb-4">
                     <p className="text-sm text-green-700">Accès à tous les projets et outils internes GIST.</p>

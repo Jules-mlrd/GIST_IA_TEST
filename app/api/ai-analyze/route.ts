@@ -6,9 +6,7 @@ import OpenAI from "openai"
 import path from "path"
 import { readPdfFromS3Robust } from "@/lib/readPdfRobust"
 
-// Si tu as une erreur 'Cannot find module "openai"', installe-le avec : npm install openai
 
-// Helper pour lire un stream S3 en buffer (centralisé)
 async function getS3FileBuffer(key: string): Promise<Buffer> {
   const command = new GetObjectCommand({
     Bucket: process.env.AWS_BUCKET_NAME!,
@@ -56,7 +54,7 @@ async function askOpenAI(prompt: string, maxRetries = 2): Promise<string> {
     } catch (err) {
       lastError = err
       if (attempt < maxRetries) {
-        const delay = 500 * Math.pow(2, attempt) // 500ms, 1000ms
+        const delay = 500 * Math.pow(2, attempt) 
         await new Promise(res => setTimeout(res, delay))
       }
     }
@@ -99,7 +97,6 @@ const FILE_HANDLERS: Record<string, (key: string) => Promise<string | Buffer>> =
   doc: readDocxFromS3,
 }
 
-// Fonction utilitaire pour extraire le premier objet JSON valide d'une chaîne
 function extractFirstJsonObject(str: string) {
   const match = str.match(/{[\s\S]*}/);
   if (!match) return null;
@@ -110,9 +107,7 @@ function extractFirstJsonObject(str: string) {
   }
 }
 
-// Extraction locale pour devis (regex/heuristique)
 function extractDevisData(text: string) {
-  // Nettoyage de base
   let cleanedText = text
     .replace(/Page \d+\/\d+/g, '')
     .replace(/\r/g, '')
@@ -122,7 +117,6 @@ function extractDevisData(text: string) {
     .replace(/[•·●]/g, '-')
     .trim();
 
-  // Patterns de lignes (tab, espaces multiples, points-virgules, pipe)
   const patterns = [
     { name: 'tab', regex: /^(.*?)(?:\t| {2,})(\d+(?:[.,]\d+)?)(?:\t| {2,})(\d+(?:[.,]\d+)?)(?:\t| {2,})(\d+(?:[.,]\d+)?)/gm },
     { name: 'semicolon', regex: /^(.*?);(\d+(?:[.,]\d+)?);(\d+(?:[.,]\d+)?);(\d+(?:[.,]\d+)?)/gm },
@@ -148,9 +142,7 @@ function extractDevisData(text: string) {
       break;
     }
   }
-  // Filtrage des lignes plausibles
   const plausibleLines = lines.filter(l => {
-    // Description non vide, quantite/prix/total > 0, pas de lignes bruitées
     const q = parseFloat(l.quantite);
     const p = parseFloat(l.prixUnitaire);
     const t = parseFloat(l.totalLigne);
@@ -161,7 +153,6 @@ function extractDevisData(text: string) {
       q > 0 && p > 0 && t >= 0
     );
   });
-  // Extraction des totaux (plus tolérant)
   function extractTotal(label: string) {
     const rgx = new RegExp(label + '\\s*:?\\s*([\u20ac\d., ]+)', 'i');
     const found = cleanedText.match(rgx);
@@ -174,7 +165,6 @@ function extractDevisData(text: string) {
   const tva = extractTotal('tva');
   const totalTTC = extractTotal('total\\s*ttc');
 
-  // Message d'avertissement si aucune ligne plausible détectée
   let warning = null;
   if (!plausibleLines.length) {
     warning = "Aucune ligne de tableau exploitable détectée automatiquement. Le PDF est peut-être mal structuré, bruité ou le tableau n'est pas reconnu. Les totaux ont été extraits si possible. Vous pouvez vérifier le texte extrait ci-dessous.";
@@ -243,18 +233,15 @@ export async function POST(req: Request) {
   let devisAnalysis: any[] = []
   for (const devis of devisTexts) {
     try {
-      // Pré-analyse locale
       const localExtract = extractDevisData(devis.text);
       let data = null;
       if (localExtract.lines && localExtract.lines.length > 0) {
-        // Prompt enrichi classique
         const prompt = `Voici le texte d'un devis fournisseur :\n"""\n${localExtract.cleanedText}\n"""\nVoici ce que j'ai extrait automatiquement :\nLignes : ${JSON.stringify(localExtract.lines, null, 2)}\nTotaux détectés : HT=${localExtract.totalHT}, TVA=${localExtract.tva}, TTC=${localExtract.totalTTC}\nMerci de corriger/compléter si besoin et de répondre en JSON structuré : { resume: {...}, totaux: {...}, anomalies: [...], lignes: [...], autresInfos: {...}, texteExtrait: "..." }`;
         const aiResp = await askOpenAI(prompt)
         const jsonStart = aiResp.indexOf("{")
         const jsonEnd = aiResp.lastIndexOf("}") + 1
         const jsonString = aiResp.slice(jsonStart, jsonEnd)
         data = JSON.parse(jsonString)
-        // Normalisation des sections
         devisAnalysis.push({
           key: devis.key,
           resume: data.resume || {},
@@ -271,7 +258,6 @@ export async function POST(req: Request) {
           localExtract
         })
       } else {
-        // Fallback : prompt ultra-guidé
         const fallbackPrompt = `Le tableau du devis n'a pas été reconnu automatiquement. Voici le texte extrait :\n"""\n${localExtract.cleanedText}\n"""\nTente de reconstituer les sections suivantes, même si le texte est bruité ou mal structuré :\n- resume : fiche synthétique (fournisseur, date, objet, etc.)\n- totaux : totalHT, tva, totalTTC, sommeLignes\n- anomalies : liste d'anomalies ou incohérences\n- lignes : tableau des lignes (description, quantité, prix unitaire, total ligne)\n- autresInfos : mentions légales, conditions, etc.\n- texteExtrait : le texte brut extrait\nRéponds uniquement en JSON structuré, même si certains champs sont partiels ou incertains.\nExemple : {\n  "resume": {"fournisseur": "Nom", "date": "2024-06-01", "objet": "Achat"},\n  "totaux": {"totalHT": "200", "tva": "40", "totalTTC": "240", "sommeLignes": "200"},\n  "anomalies": ["Total TTC incohérent"],\n  "lignes": [{"description": "Fourniture X", "quantite": "2", "prixUnitaire": "100", "totalLigne": "200"}],\n  "autresInfos": {"conditions": "30 jours fin de mois"},\n  "texteExtrait": "..."\n}`;
         let aiResp = await askOpenAI(fallbackPrompt)
         let jsonStart = aiResp.indexOf("{")
@@ -296,12 +282,10 @@ export async function POST(req: Request) {
             fallback: true
           })
         } catch (e) {
-          // Si parsing échoue, retourne warning et texte brut comme avant
           devisAnalysis.push({ key: devis.key, error: "Erreur IA ou parsing (fallback)", details: String(e), localExtract })
         }
       }
     } catch (e: any) {
-      // Toujours retourner le texte extrait, le warning, et les lignes plausibles même en cas d'erreur IA
       const localExtract = extractDevisData(devis.text);
       devisAnalysis.push({ key: devis.key, error: "Erreur IA ou parsing", details: e?.message, localExtract })
     }
@@ -314,7 +298,6 @@ export async function POST(req: Request) {
       const parsed = await parseStructuredFile(excel.buffer, excel.key)
       let summary = parsed.summary || ""
       let data = Array.isArray(parsed.data) ? parsed.data.slice(0, 20) : [];
-      // Limiter à 20 colonnes max
       if (data.length > 0) {
         const allCols = Object.keys(data[0]);
         const limitedCols = allCols.slice(0, 20);
@@ -324,23 +307,17 @@ export async function POST(req: Request) {
           return newRow;
         });
       }
-      // Détection auto des colonnes numériques/catégorielles
       const columns = data.length > 0 ? Object.keys(data[0]) : [];
       const numericCols = columns.filter(col => data.every(row => typeof row[col] === 'number' || (!isNaN(parseFloat(row[col])) && row[col] !== null && row[col] !== '')));
       const catCols = columns.filter(col => !numericCols.includes(col));
-      // Générer des suggestions auto de graphiques
       const autoCharts: any[] = [];
       if (numericCols.length && catCols.length) {
-        // Bar chart : 1 cat, 1 num
         autoCharts.push({ title: `Répartition ${numericCols[0]} par ${catCols[0]}`, type: 'bar', x: catCols[0], y: numericCols[0], explanation: `Bar chart de ${numericCols[0]} par ${catCols[0]}` });
-        // Pie chart : 1 cat, 1 num
         autoCharts.push({ title: `Camembert ${numericCols[0]} par ${catCols[0]}`, type: 'pie', x: catCols[0], y: numericCols[0], explanation: `Camembert de ${numericCols[0]} par ${catCols[0]}` });
       }
       if (numericCols.length >= 2) {
-        // Line chart : 2 num
         autoCharts.push({ title: `Courbe ${numericCols[1]} vs ${numericCols[0]}`, type: 'line', x: numericCols[0], y: numericCols[1], explanation: `Courbe de ${numericCols[1]} en fonction de ${numericCols[0]}` });
       }
-      // Statistiques pour prompt IA
       const stats: Record<string, any> = {};
       for (const col of numericCols) {
         const vals = data.map(row => parseFloat(row[col])).filter(v => !isNaN(v));
@@ -355,7 +332,6 @@ export async function POST(req: Request) {
       let aiData = {};
       let charts = [];
       if (data.length > 0) {
-        // Détection locale du type de chaque colonne + stats + identifiants uniques
         function detectType(values: any[]) {
           if (values.every((v: any) => typeof v === 'number' || (!isNaN(parseFloat(v)) && v !== null && v !== ''))) return 'numérique';
           if (values.every((v: any) => typeof v === 'string' && !isNaN(Date.parse(v)))) return 'date';
@@ -388,16 +364,13 @@ export async function POST(req: Request) {
           }
           return colObj;
         });
-        // Filtrer les identifiants uniques
         const filteredColumns = columnSamples.filter(c => !c.unique);
-        // Prompt ultra-guidé
         const prompt = `Contexte : Ce tableau provient d'un projet SNCF. Les colonnes sont listées ci-dessous avec leur type détecté, des exemples de valeurs, et un résumé statistique pour les colonnes numériques.\n\nColonnes :\n${JSON.stringify(filteredColumns, null, 2)}\n\nRègles :\n- Propose 1 à 3 graphiques maximum, chacun sous la forme {type, x, y, title, explanation}.\n- Ne propose que des croisements pertinents statistiquement ET métier (ex : "Coût par Département", "Nombre de membres par Chef d'équipe").\n- N'invente pas de croisements absurdes (ex : deux colonnes texte, deux dates, identifiants uniques, etc.).\n- Ignore les colonnes qui semblent être des identifiants uniques ou des codes.\n- Pour chaque graphique, explique en 1 phrase pourquoi il est pertinent pour un chef de projet SNCF.\n- Si aucune combinaison n'est pertinente, réponds [].\n\nExemples de graphiques pertinents :\n- Barres : "Coût" par "Département"\n- Camembert : "Nombre de membres" par "Chef d'équipe"\n- Courbe : "Coût" en fonction du temps (si une colonne date existe)\n\nRéponds uniquement en JSON, sans texte autour, sous la forme :\n[\n  { "type": "bar", "x": "Département", "y": "Coût", "title": "Répartition du coût par département", "explanation": "Permet de visualiser les coûts par service pour optimiser le budget." },\n  ...\n]`;
         const aiResp = await askOpenAI(prompt);
         let aiCharts = [];
         try {
           aiCharts = JSON.parse(aiResp.match(/\[([\s\S]*?)\]/)?.[0] || '[]');
         } catch { aiCharts = []; }
-        // Fallback automatique si rien de pertinent
         if (!aiCharts.length) {
           const firstCat = filteredColumns.find(c => c.type === 'texte');
           const firstNum = filteredColumns.find(c => c.type === 'numérique');
@@ -411,7 +384,6 @@ export async function POST(req: Request) {
           }
         }
         charts = aiCharts;
-        // On peut aussi garder l'ancien prompt pour résumé/keypoints
         const preview = JSON.stringify(data);
         const statsStr = Object.keys(stats).length ? `\nStatistiques colonnes numériques: ${JSON.stringify(stats)}` : '';
         const promptSummary = PROMPTS.excel(preview + statsStr, excel.ext);
@@ -424,7 +396,6 @@ export async function POST(req: Request) {
           }
         } catch {}
       }
-      // Fusionner les suggestions de graphiques (charts IA + autoCharts)
       const allCharts = [ ...(charts || []), ...autoCharts ];
       excelAnalysis.push({ key: excel.key, ...parsed, ...aiData, charts: allCharts, data });
     } catch (e: any) {
@@ -514,7 +485,6 @@ export async function POST_custom_chart(req: Request) {
     console.log("[AI RAW RESPONSE]", aiResp);
     let chartConfig = extractFirstJsonObject(aiResp);
     if (!chartConfig) {
-      // Tentative 2 avec prompt plus strict
       const reformulatedPrompt = `${prompt}\nRéponds uniquement par un objet JSON, sans aucun texte autour. Exemple : {\"type\":\"bar\",\"x\":\"Nom\",\"y\":\"Valeur\",\"title\":\"Titre\",\"explanation\":\"...\"}`;
       const aiResp2 = await askOpenAI(reformulatedPrompt);
       console.log("[AI RAW RESPONSE][Tentative 2]", aiResp2);

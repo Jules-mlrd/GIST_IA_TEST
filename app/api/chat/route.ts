@@ -208,7 +208,7 @@ async function semanticSearchInFiles(question: string, pdfKeys: string[], txtKey
       passages.push({ file: key, passage: para });
     }
   }
-  // PDF
+
   for (const key of pdfKeys) {
     const text = await fetchPdfTextFromS3(bucketName, key);
     const paras = text.split(/\n\n+/).filter(p => p.trim().length > 30);
@@ -346,7 +346,6 @@ export async function POST(req: Request) {
     if (intentEntities.entities) {
       for (const ent of intentEntities.entities) {
         if (ent.type === 'file' || ent.type === 'document') {
-          // Cherche le fichier dans les PDF, TXT, CSV
           let file: (FileReference & { activeCount?: number }) | null = null;
           for (const key of pdfKeys) {
             const docName = key.split('/').pop()?.replace('.pdf', '') || '';

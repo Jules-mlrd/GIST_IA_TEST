@@ -12,7 +12,6 @@ export async function GET(req: NextRequest) {
     if (!fileParam || typeof fileParam !== "string" || !fileParam.trim()) {
       return NextResponse.json({ error: "Aucun fichier sélectionné." }, { status: 400 })
     }
-    // Lister tous les fichiers PDF et TXT
     let pdfFiles: string[] = []
     let txtFiles: string[] = []
     try {
@@ -48,8 +47,6 @@ export async function GET(req: NextRequest) {
     if (text.trim().startsWith("<!DOCTYPE")) {
       return NextResponse.json({ error: `Le contenu du fichier semble être du HTML (erreur S3 ou parsing) pour le fichier: ${file}` }, { status: 500 })
     }
-    // Log debug (tronqué)
-    // console.log("PREVIEW TEXTE:", text.slice(0, 200))
     const preview = text.slice(0, 500)
     return NextResponse.json({ preview })
   } catch (e: any) {

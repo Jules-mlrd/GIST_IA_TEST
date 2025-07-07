@@ -130,7 +130,6 @@ export default function HelpCenterPage() {
   return (
     <Layout title="Centre d'aide & Découverte" subtitle="Comprenez et exploitez toutes les fonctionnalités de l'application">
       <div className="w-full min-h-[80vh] flex flex-col items-center justify-start bg-sidebar py-8 px-2" style={{ backgroundColor: "hsl(var(--sidebar-background))" }}>
-        {/* Bannière d'accueil */}
         <div className="max-w-3xl w-full text-center mb-10">
           <div className="flex justify-center mb-4">
             <LifeBuoy className="h-14 w-14 text-blue-400" />
@@ -139,7 +138,6 @@ export default function HelpCenterPage() {
           <p className="text-lg md:text-xl text-gray-700">Votre assistant IA pour la gestion de projet SNCF. Découvrez comment tirer le meilleur parti de la plateforme.</p>
         </div>
 
-        {/* Grid de sections */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 w-full max-w-6xl mb-12">
           {sections.map((section, idx) => (
             <Card key={idx} className="flex flex-col items-center p-6 shadow-lg hover:shadow-2xl transition-shadow border-2 border-blue-100 bg-white/95 rounded-2xl">
@@ -153,7 +151,6 @@ export default function HelpCenterPage() {
           ))}
         </div>
 
-        {/* Parcours guidé */}
         <div className="w-full max-w-4xl bg-white/90 rounded-xl shadow p-8 mb-12">
           <h2 className="text-2xl font-bold text-blue-700 mb-4 text-center">Premiers pas sur la plateforme</h2>
           <ol className="list-decimal list-inside space-y-2 text-gray-700 text-lg">
@@ -163,7 +160,6 @@ export default function HelpCenterPage() {
           </ol>
         </div>
 
-        {/* Tabs pour formulaire et FAQ tout en bas */}
         <div ref={formulaireRef} className="w-full max-w-5xl mb-12 mt-8">
           <Tabs value={tab} onValueChange={setTab} className="w-full">
             <TabsList className="flex w-full justify-center gap-4 bg-transparent pt-6">

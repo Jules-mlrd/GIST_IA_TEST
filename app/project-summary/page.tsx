@@ -48,9 +48,7 @@ export default function ProjectSummaryPage() {
   const [fileName, setFileName] = useState<string>("")
   const [refreshFlag, setRefreshFlag] = useState(0)
 
-  // Durée de validité du cache (ms)
-  const CACHE_DURATION = 30 * 60 * 1000 // 30 minutes
-
+  const CACHE_DURATION = 30 * 60 * 1000 
   useEffect(() => {
     async function fetchSummary() {
       setLoading(true)
@@ -58,7 +56,6 @@ export default function ProjectSummaryPage() {
       setProject(null)
       setRaw(null)
       setFileName("")
-      // 1. Vérifier le cache localStorage
       const cacheStr = typeof window !== "undefined" ? localStorage.getItem("projectSummaryCache") : null
       let cache: any = null
       if (cacheStr) {
@@ -66,9 +63,7 @@ export default function ProjectSummaryPage() {
       }
       const now = Date.now()
       if (cache && cache.data && cache.timestamp && (now - cache.timestamp < CACHE_DURATION)) {
-        // Utiliser le cache
         const data = cache.data
-        // ... logique de filtrage fichier ...
         const found = data.summaries.find((item: any) =>
           item.file &&
           /rapport complet|présentation du projet/i.test(item.file)
@@ -84,7 +79,6 @@ export default function ProjectSummaryPage() {
         setLoading(false)
         return
       }
-      // 2. Sinon, fetch l'API
       try {
         const res = await fetch("/api/project-summary")
         const data = await res.json()
@@ -98,11 +92,9 @@ export default function ProjectSummaryPage() {
           setLoading(false)
           return
         }
-        // Mettre à jour le cache
         if (typeof window !== "undefined") {
           localStorage.setItem("projectSummaryCache", JSON.stringify({ data, timestamp: Date.now() }))
         }
-        // Filtrer le fichier dont le titre contient 'rapport complet' ou 'présentation du projet'
         const found = data.summaries.find((item: any) =>
           item.file &&
           /rapport complet|présentation du projet/i.test(item.file)
@@ -122,10 +114,8 @@ export default function ProjectSummaryPage() {
       }
     }
     fetchSummary()
-    // eslint-disable-next-line
   }, [refreshFlag])
 
-  // Bouton pour forcer le refresh
   function handleRefresh() {
     if (typeof window !== "undefined") {
       localStorage.removeItem("projectSummaryCache")
@@ -152,7 +142,6 @@ export default function ProjectSummaryPage() {
   const globalSummary = typeof project?.globalSummary === "string"
     ? project.globalSummary
     : (project?.globalSummary?.toString() || "Aucun résumé global généré.");
-  // KPIs
   const kpiList = [
     { label: "Avancement", value: project.avancement?.percent ?? 0, icon: <Target className="h-5 w-5 text-green-600" />, color: "bg-green-100 text-green-800" },
     { label: "Budget utilisé", value: project.budget?.usedPercent ?? 0, icon: <Building className="h-5 w-5 text-yellow-600" />, color: "bg-yellow-100 text-yellow-800" },
@@ -160,7 +149,6 @@ export default function ProjectSummaryPage() {
     { label: "Jalons", value: Array.isArray(project.jalons) ? project.jalons.length : 0, icon: <Flag className="h-5 w-5 text-blue-600" />, color: "bg-blue-100 text-blue-800" },
   ]
 
-  // Timeline data (phases + jalons)
   const timeline = [
     ...(Array.isArray(project.phases) ? project.phases.map((p: any) => ({
       type: "phase",
@@ -178,19 +166,16 @@ export default function ProjectSummaryPage() {
     })) : [])
   ].sort((a, b) => (a.date || "").localeCompare(b.date || ""))
 
-  // Risques critiques (top 3 par criticité)
   const risquesCritiques = (Array.isArray(project.risques) ? [...project.risques] : [])
     .sort((a, b) => (b.criticite || "").localeCompare(a.criticite || ""))
     .slice(0, 3)
 
-  // Contacts clés (chef de projet, client, parties prenantes principales)
   const contacts = [
     { ...project.projectManager, role: "Chef de projet" },
     ...(project.client?.contact ? [{ ...project.client, role: "Client" }] : []),
     ...(Array.isArray(project.partiesPrenantes) ? project.partiesPrenantes.slice(0, 3) : [])
   ]
 
-  // Budget donut data
   const budgetUsed = Number(project.budget?.usedPercent) || 0
   const budgetRestant = 100 - budgetUsed
   const budgetData = {
@@ -210,7 +195,6 @@ export default function ProjectSummaryPage() {
         <div className="flex justify-end mb-2">
           <button onClick={handleRefresh} className="px-4 py-2 rounded bg-blue-100 text-blue-800 font-semibold hover:bg-blue-200 transition">Rafraîchir</button>
         </div>
-        {/* Widget Résumé global */}
         <div className="bg-green-50 border border-green-200 rounded p-6 shadow-sm mb-2">
           <div className="flex items-center gap-2 mb-2">
             <BookOpen className="h-6 w-6 text-green-700" />
@@ -218,10 +202,8 @@ export default function ProjectSummaryPage() {
           </div>
           <div className="text-gray-900 text-base whitespace-pre-line">{globalSummary}</div>
         </div>
-        {/* Widgets synthétiques (affichés seulement si infos structurées présentes) */}
         {(project.projectName !== "Projet inconnu" || project.objectifs.length > 0 || project.risques.length > 0) && (
         <>
-        {/* KPIs synthèse */}
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 bg-blue-50 border border-blue-100 rounded p-6 shadow-sm">
           <div>
             <div className="flex items-center gap-3 mb-2">
@@ -252,19 +234,15 @@ export default function ProjectSummaryPage() {
             ))}
           </div>
         </div>
-        {/* Widgets row */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {/* Widget Budget */}
           <div className="bg-white rounded border p-6 shadow-sm flex flex-col items-center">
             <div className="font-semibold mb-2 flex items-center gap-2"><Building className="h-5 w-5 text-yellow-600" /> Budget</div>
             <div className="w-32 h-32 flex items-center justify-center relative">
-              {/* Donut chart */}
               <Pie data={budgetData} options={{ cutout: "70%", plugins: { legend: { display: false } } }} />
               <div className="absolute text-xl font-bold text-yellow-700 left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">{budgetUsed}%</div>
             </div>
             <div className="text-xs text-gray-500 mt-2">{project.budget?.total ? `Total : ${project.budget.total}` : "Total inconnu"}</div>
           </div>
-          {/* Widget Risques critiques */}
           <div className="bg-white rounded border p-6 shadow-sm">
             <div className="font-semibold mb-2 flex items-center gap-2"><ShieldAlert className="h-5 w-5 text-red-600" /> Risques critiques</div>
             {risquesCritiques.length > 0 ? (
@@ -279,7 +257,6 @@ export default function ProjectSummaryPage() {
               </ul>
             ) : <div className="text-gray-500 text-sm">Aucun risque critique détecté.</div>}
           </div>
-          {/* Widget Contacts clés */}
           <div className="bg-white rounded border p-6 shadow-sm">
             <div className="font-semibold mb-2 flex items-center gap-2"><Users className="h-5 w-5 text-purple-600" /> Contacts clés</div>
             <ul className="space-y-2">
@@ -295,7 +272,6 @@ export default function ProjectSummaryPage() {
             </ul>
           </div>
         </div>
-        {/* Timeline */}
         <div className="bg-white rounded border p-6 shadow-sm">
           <div className="font-semibold mb-4 flex items-center gap-2"><CalendarIcon className="h-5 w-5 text-purple-600" /> Timeline projet</div>
           <div className="flex flex-col md:flex-row gap-4 items-center">
@@ -309,7 +285,6 @@ export default function ProjectSummaryPage() {
             )) : <div className="text-gray-500 text-sm">Aucune phase ou jalon détecté.</div>}
           </div>
         </div>
-        {/* Blocages & alertes */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div className="bg-white rounded border p-6 shadow-sm">
             <div className="font-semibold mb-2 flex items-center gap-2"><AlertCircle className="h-5 w-5 text-red-600" /> Blocages</div>
@@ -328,7 +303,6 @@ export default function ProjectSummaryPage() {
             ) : <div className="text-gray-500 text-sm">Aucune alerte détectée.</div>}
           </div>
         </div>
-        {/* Prochaines actions & livrables */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div className="bg-white rounded border p-6 shadow-sm">
             <div className="font-semibold mb-2 flex items-center gap-2"><ListTodo className="h-5 w-5 text-green-600" /> Prochaines actions</div>
@@ -347,7 +321,6 @@ export default function ProjectSummaryPage() {
             ) : <div className="text-gray-500 text-sm">Aucun livrable détecté.</div>}
           </div>
         </div>
-        {/* Description & objectifs (en bas pour la complétude) */}
         <div className="flex flex-col md:flex-row gap-6">
           <div className="flex-1 bg-white rounded border p-6 shadow-sm">
             <div className="flex items-center gap-2 mb-2"><BookOpen className="h-5 w-5 text-green-600" /><span className="font-semibold">Description</span></div>
@@ -363,7 +336,6 @@ export default function ProjectSummaryPage() {
           </div>
         </div>
         </>)}
-        {/* JSON brut */}
         <div className="mt-10 w-full">
           <details>
             <summary className="cursor-pointer text-xs text-gray-400">Voir la réponse JSON complète</summary>

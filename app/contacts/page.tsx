@@ -39,7 +39,6 @@ export default function ContactsPage() {
     setLoading(true)
     setError(null)
     try {
-      // Vérifier le cache localStorage
       const cached = typeof window !== 'undefined' ? localStorage.getItem(CACHE_KEY) : null;
       if (cached) {
         const { contacts: cachedContacts, timestamp } = JSON.parse(cached);
@@ -49,12 +48,10 @@ export default function ContactsPage() {
           return;
         }
       }
-      // Sinon, appel API
       const res = await fetch("/api/contacts")
       if (!res.ok) throw new Error("Erreur lors de la récupération des contacts")
       const data = await res.json()
       setContacts(data.contacts || [])
-      // Mettre à jour le cache
       if (typeof window !== 'undefined') {
         localStorage.setItem(CACHE_KEY, JSON.stringify({ contacts: data.contacts || [], timestamp: Date.now() }))
       }
@@ -69,7 +66,6 @@ export default function ContactsPage() {
     fetchContacts()
   }, [])
 
-  // Filtrage par recherche
   const filteredContacts = contacts.filter(contact => {
     const q = search.toLowerCase()
     return (
@@ -131,13 +127,8 @@ export default function ContactsPage() {
     }
   }
 
-  // Pour savoir si un contact est manuel (issu du JSON)
   function isManualContact(contact: any) {
-    // Un contact manuel n'est pas extrait par l'IA, donc il n'a pas de champ "extrait" ou on peut marquer les contacts IA si besoin
-    // Ici, on considère qu'un contact est manuel s'il n'est pas dans la liste des contacts IA (mais pour l'instant, on ne marque pas, donc on autorise la suppression sur tous les contacts)
-    // Pour être plus strict, il faudrait marquer les contacts IA lors du GET
-    // Ici, on autorise la suppression sur tous les contacts qui ne sont pas extraits à chaque GET (donc ceux du JSON)
-    // Pour l'instant, on va autoriser la suppression sur tous les contacts, mais tu peux affiner si besoin
+    
     return true
   }
 

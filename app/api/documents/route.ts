@@ -1,9 +1,7 @@
 import { NextResponse } from "next/server"
 import { ListObjectsV2Command, DeleteObjectCommand, GetObjectCommand } from "@aws-sdk/client-s3"
 import s3, { generatePresignedUrl } from "@/lib/s3Client"
-// JSZip installé via pnpm, types inclus
 import JSZip from "jszip"
-// import type JSZip from 'jszip'; // Si besoin de typage explicite
 
 export async function GET() {
   try {
@@ -67,8 +65,7 @@ export async function POST(req: Request) {
         Key: key,
       });
       const response = await s3.send(command);
-      // @ts-ignore
-      const stream = response.Body as any; // Cast explicite pour compatibilité Node/Edge
+      const stream = response.Body as any; 
       if (!stream || typeof stream[Symbol.asyncIterator] !== "function") {
         zip.file(key.split("/").pop() + ".error.txt", `Erreur: flux S3 non disponible ou non itérable pour ${key}`);
         continue;

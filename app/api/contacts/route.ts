@@ -44,7 +44,6 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Email ou téléphone requis.' }, { status: 400 });
     }
     const contacts = readManualContacts();
-    // Vérifier doublon (email ou téléphone)
     const id = body.email || body.telephone;
     if (contacts.some((c: any) => (c.email || c.telephone) === id)) {
       return NextResponse.json({ error: 'Contact déjà existant.' }, { status: 400 });
@@ -59,10 +58,8 @@ export async function POST(req: Request) {
 
 export async function GET() {
   try {
-    // Lire le cache IA si présent
     let contacts = readExtractedContacts();
     if (!contacts.length) {
-      // Extraction IA si pas de cache
       const [pdfFiles, txtFiles] = await Promise.all([
         listPdfFilesInS3(BUCKET_NAME),
         listTxtFilesInS3(BUCKET_NAME),
@@ -97,10 +94,8 @@ export async function GET() {
       contacts = contactsArrays.flat();
       writeExtractedContacts(contacts);
     }
-    // Dédoublonner par email ou téléphone
     const uniqueContacts = [];
     const seen = new Set();
-    // Ajouter d'abord les contacts manuels du fichier JSON
     const manualContacts = readManualContacts();
     for (const c of manualContacts) {
       const id = c.email || c.telephone;
@@ -148,7 +143,6 @@ export async function DELETE(req: Request) {
 
 export async function POST_refresh(_: Request) {
   try {
-    // Extraction IA forcée
     const [pdfFiles, txtFiles] = await Promise.all([
       listPdfFilesInS3(BUCKET_NAME),
       listTxtFilesInS3(BUCKET_NAME),

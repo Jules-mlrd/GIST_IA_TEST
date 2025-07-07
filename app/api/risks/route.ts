@@ -44,7 +44,6 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Description requise.' }, { status: 400 });
     }
     const risks = readManualRisks();
-    // Ajout d'un id unique
     const id = Date.now() + '-' + Math.floor(Math.random() * 10000);
     const newRisk = { ...body, id };
     risks.push(newRisk);
@@ -60,7 +59,6 @@ export async function DELETE(req: Request) {
     const { id, description } = await req.json();
     let risks = readManualRisks();
     const before = risks.length;
-    // Priorité à l'id si présent
     if (id) {
       risks = risks.filter((r: any) => r.id !== id);
     } else if (description) {
@@ -78,7 +76,6 @@ export async function DELETE(req: Request) {
 
 export async function POST_refresh(_: Request) {
   try {
-    // Extraction IA forcée
     const [pdfFiles, txtFiles] = await Promise.all([
       listPdfFilesInS3(BUCKET_NAME),
       listTxtFilesInS3(BUCKET_NAME),
@@ -120,10 +117,8 @@ export async function POST_refresh(_: Request) {
 
 export async function GET() {
   try {
-    // Lire le cache IA si présent
     let risks = readExtractedRisks();
     const manualRisks = readManualRisks();
-    // Fusionner manuels + IA
     const allRisks = [...manualRisks, ...risks];
     return NextResponse.json({ risks: allRisks });
   } catch (error) {

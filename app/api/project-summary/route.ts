@@ -79,7 +79,6 @@ export async function GET(req: NextRequest) {
       }
       return NextResponse.json({ files: [...pdfFiles, ...txtFiles] })
     }
-    // NOUVEAU : Résumer tous les fichiers du bucket
     let pdfFiles: string[] = []
     let txtFiles: string[] = []
     try {

@@ -370,7 +370,6 @@ export default function DeclarationAffairePage() {
             </div>
           </div>
 
-          {/* Membres clés dynamiques */}
           <div className="mt-4">
             <label className="font-medium">Membres clés</label>
             {fields.teamMembers.map((m, idx) => (
@@ -384,7 +383,6 @@ export default function DeclarationAffairePage() {
             <Button type="button" size="sm" className="mt-2" onClick={() => setFields(f => ({ ...f, teamMembers: [...f.teamMembers, { name: "", role: "", contact: "" }] }))}>Ajouter un membre</Button>
           </div>
 
-          {/* Partenaires dynamiques */}
           <div className="mt-4">
             <label className="font-medium">Partenaires</label>
             {fields.partners.map((p, idx) => (
@@ -396,7 +394,6 @@ export default function DeclarationAffairePage() {
             <Button type="button" size="sm" className="mt-2" onClick={() => setFields(f => ({ ...f, partners: [...f.partners, ""] }))}>Ajouter un partenaire</Button>
           </div>
 
-          {/* Budget */}
           <div className="mt-4">
             <label className="font-medium">Budget</label>
             <div className="flex gap-2 mt-1">
@@ -404,7 +401,6 @@ export default function DeclarationAffairePage() {
               <Input placeholder="Utilisé" value={fields.budget.used} onChange={e => setFields(f => ({ ...f, budget: { ...f.budget, used: e.target.value } }))} />
               <Input placeholder="Restant" value={fields.budget.remaining} onChange={e => setFields(f => ({ ...f, budget: { ...f.budget, remaining: e.target.value } }))} />
             </div>
-            {/* Postes de dépense dynamiques */}
             <div className="mt-2">
               <label className="text-sm">Postes de dépense</label>
               {fields.budget.mainExpenses.map((exp, idx) => (
@@ -416,7 +412,6 @@ export default function DeclarationAffairePage() {
               ))}
               <Button type="button" size="sm" className="mt-2" onClick={() => setFields(f => ({ ...f, budget: { ...f.budget, mainExpenses: [...f.budget.mainExpenses, { label: "", amount: "" }] } }))}>Ajouter un poste</Button>
             </div>
-            {/* Alertes budget dynamiques */}
             <div className="mt-2">
               <label className="text-sm">Alertes budget</label>
               {fields.budget.alerts.map((a, idx) => (
@@ -429,7 +424,6 @@ export default function DeclarationAffairePage() {
             </div>
           </div>
 
-          {/* Jalons dynamiques */}
           <div className="mt-4">
             <label className="font-medium">Jalons</label>
             {fields.milestones.map((m, idx) => (
@@ -442,7 +436,6 @@ export default function DeclarationAffairePage() {
             <Button type="button" size="sm" className="mt-2" onClick={() => setFields(f => ({ ...f, milestones: [...f.milestones, { date: "", label: "" }] }))}>Ajouter un jalon</Button>
           </div>
 
-          {/* Livrables dynamiques */}
           <div className="mt-4">
             <label className="font-medium">Livrables</label>
             {fields.deliverables.map((d, idx) => (
@@ -455,7 +448,6 @@ export default function DeclarationAffairePage() {
             <Button type="button" size="sm" className="mt-2" onClick={() => setFields(f => ({ ...f, deliverables: [...f.deliverables, { label: "", status: "" }] }))}>Ajouter un livrable</Button>
           </div>
 
-          {/* Risques dynamiques */}
           <div className="mt-4">
             <label className="font-medium">Risques</label>
             {fields.risks.map((r, idx) => (
@@ -469,7 +461,6 @@ export default function DeclarationAffairePage() {
             <Button type="button" size="sm" className="mt-2" onClick={() => setFields(f => ({ ...f, risks: [...f.risks, { description: "", level: "", owner: "" }] }))}>Ajouter un risque</Button>
           </div>
 
-          {/* Contacts dynamiques */}
           <div className="mt-4">
             <label className="font-medium">Contacts importants</label>
             {fields.contacts.map((c, idx) => (
@@ -483,10 +474,8 @@ export default function DeclarationAffairePage() {
             <Button type="button" size="sm" className="mt-2" onClick={() => setFields(f => ({ ...f, contacts: [...f.contacts, { name: "", role: "", contact: "" }] }))}>Ajouter un contact</Button>
           </div>
 
-          {/* Mentions légales */}
           <Textarea className="mt-4" placeholder="Mentions légales ou contractuelles" value={fields.legal} onChange={e => setFields(f => ({ ...f, legal: e.target.value }))} />
 
-          {/* Progression et alertes planning */}
           <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
             <Input placeholder="Avancement (%)" value={fields.progress} onChange={e => setFields(f => ({ ...f, progress: e.target.value }))} />
             <div>
@@ -504,7 +493,6 @@ export default function DeclarationAffairePage() {
           <Textarea className="mt-4" placeholder="Commentaires libres" value={fields.comments} onChange={e => setFields(f => ({ ...f, comments: e.target.value }))} />
         </section>
 
-        {/* Section 5 : Export PDF */}
         <section className="bg-white border rounded-lg p-4 shadow-sm flex flex-col gap-2">
           <Button onClick={handleExportPDF} variant="outline">Exporter en PDF</Button>
         </section>

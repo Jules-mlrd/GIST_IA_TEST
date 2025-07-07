@@ -33,7 +33,6 @@ export default function DocumentsPage() {
   const [previewTxt, setPreviewTxt] = useState<string | null>(null)
   const [loadingPreview, setLoadingPreview] = useState(false)
 
-  // Fetch documents helper
   const fetchDocuments = async () => {
     try {
       const res = await fetch("/api/documents")
@@ -172,7 +171,6 @@ export default function DocumentsPage() {
     }
   }
 
-  // Handle file deletion
   const handleDelete = async () => {
     if (!deleteKey) return
     setDeleting(true)
@@ -317,7 +315,6 @@ export default function DocumentsPage() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
-        {/* Delete confirmation dialog */}
         <Dialog open={!!deleteKey} onOpenChange={open => { if (!open) setDeleteKey(null) }}>
           <DialogContent>
             <DialogHeader>

@@ -20,7 +20,7 @@ const allProjects = [
 		startDate: "Jan 2024",
 		endDate: "Dec 2024",
 		isFullyImplemented: true,
-		clientAccess: true, // This project is accessible to clients
+		clientAccess: true, 
 	},
 	{
 		id: "GIST-2024-002",
@@ -33,7 +33,7 @@ const allProjects = [
 		startDate: "Mar 2024",
 		endDate: "Sep 2025",
 		isFullyImplemented: false,
-		clientAccess: false, // Internal project only
+		clientAccess: false, 
 	},
 	{
 		id: "GIST-2024-003",
@@ -46,7 +46,7 @@ const allProjects = [
 		startDate: "Nov 2023",
 		endDate: "Jun 2024",
 		isFullyImplemented: false,
-		clientAccess: false, // Internal project only
+		clientAccess: false,
 	},
 	{
 		id: "GIST-2024-004",
@@ -59,7 +59,7 @@ const allProjects = [
 		startDate: "Jun 2024",
 		endDate: "Dec 2026",
 		isFullyImplemented: false,
-		clientAccess: false, // Internal project only
+		clientAccess: false, 
 	},
 	{
 		id: "GIST-2024-005",
@@ -72,7 +72,7 @@ const allProjects = [
 		startDate: "Feb 2024",
 		endDate: "Nov 2024",
 		isFullyImplemented: false,
-		clientAccess: false, // Internal project only
+		clientAccess: false, 
 	},
 	{
 		id: "GIST-2023-012",
@@ -85,7 +85,7 @@ const allProjects = [
 		startDate: "Jan 2023",
 		endDate: "Dec 2023",
 		isFullyImplemented: false,
-		clientAccess: false, // Internal project only
+		clientAccess: false, 
 	},
 ]
 
@@ -96,7 +96,6 @@ export default function ProjectSelectionPage() {
 	const router = useRouter()
 
 	useEffect(() => {
-		// Check authentication
 		const isAuthenticated = localStorage.getItem("gist-authenticated")
 		const currentUserType = localStorage.getItem("gist-user-type")
 
@@ -107,15 +106,12 @@ export default function ProjectSelectionPage() {
 
 		setUserType(currentUserType)
 
-		// Filter projects based on user type and search query
 		let projectsToShow = allProjects
 
-		// If user is a client, only show projects with clientAccess: true
 		if (currentUserType === "client") {
 			projectsToShow = allProjects.filter((project) => project.clientAccess)
 		}
 
-		// Apply search filter
 		const filtered = projectsToShow.filter(
 			(project) =>
 				project.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -160,7 +156,6 @@ export default function ProjectSelectionPage() {
 
 	return (
 		<div className="min-h-screen bg-gray-50">
-			{/* Header */}
 			<header className="bg-white border-b border-gray-200 px-6 py-4 shadow-sm">
 				<div className="max-w-7xl mx-auto">
 					<div className="flex items-center justify-between">
@@ -196,7 +191,6 @@ export default function ProjectSelectionPage() {
 				</div>
 			</header>
 
-			{/* Main Content */}
 			<main className="max-w-7xl mx-auto p-6">
 				<div className="mb-8">
 					<h2 className="text-2xl font-bold text-gray-900 mb-2">
@@ -209,7 +203,6 @@ export default function ProjectSelectionPage() {
 					</p>
 				</div>
 
-				{/* Projects Grid */}
 				<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
 					{filteredProjects.map((project) => (
 						<Card

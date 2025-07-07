@@ -46,7 +46,6 @@ function truncateText(text: string, max: number = 8000) {
   return text.length > max ? text.slice(0, max) : text;
 }
 
-// Nouveau prompt pour la fusion multi-documents
 const PROJECT_PROMPT_MULTI = (text: string, docCount: number) => `Tu es un assistant expert en gestion de projets SNCF. Tu vas analyser le contenu de ${docCount} documents de projet (PDF, TXT, etc.), parfois redondants ou contradictoires :
 
 """
@@ -88,7 +87,6 @@ Consignes :
 
 Réponds uniquement en JSON strictement valide, sans texte autour.`;
 
-// Prompt pour résumer un document long
 const RESUME_PROMPT = (text: string) => `Voici un document de projet SNCF :
 """
 ${text}
@@ -137,7 +135,6 @@ export async function POST(req: Request) {
   let totalLength = 0;
   let summarizationUsed = false;
 
-  // Extraction et gestion de la taille
   for (const key of keys) {
     const ext = key.split(".").pop()?.toLowerCase() || "";
     if (FILE_HANDLERS[ext]) {
@@ -150,7 +147,6 @@ export async function POST(req: Request) {
     }
   }
 
-  // Si la taille totale dépasse 12000 caractères, faire un résumé IA par document
   if (docSummaries.map(t => t.length).reduce((a, b) => a + b, 0) > 12000) {
     summarizationUsed = true;
     const summarizedDocs: string[] = [];
@@ -172,7 +168,6 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Aucun texte exploitable extrait des fichiers." }, { status: 400 });
   }
 
-  // Prompt fusion IA
   const fusionPrompt = (text: string, docCount: number, currentFields: any) => `Tu es un assistant expert en gestion de projets SNCF. Tu vas analyser le contenu de ${docCount} nouveaux documents de projet (PDF, TXT, etc.) :
 """
 ${text}
@@ -203,7 +198,6 @@ Consignes :
     const jsonEnd = aiResponse.lastIndexOf("}") + 1;
     const jsonString = aiResponse.slice(jsonStart, jsonEnd);
     const data = JSON.parse(jsonString);
-    // Ajout du header si résumé IA utilisé ou fusion IA utilisée
     if (summarizationUsed || currentFields) {
       const headers: Record<string, string> = { "Content-Type": "application/json" };
       if (summarizationUsed) {
@@ -223,9 +217,7 @@ Consignes :
   }
 }
 
-// Nouvelle route pour exporter la déclaration d'affaire en PDF
 export async function PUT(req: Request) {
-  // On attend le JSON de la fiche projet dans le body
   let data;
   try {
     data = await req.json();
@@ -233,7 +225,6 @@ export async function PUT(req: Request) {
     return NextResponse.json({ error: 'JSON invalide' }, { status: 400 });
   }
 
-  // Création du PDF
   const pdfDoc = await PDFDocument.create();
   const page = pdfDoc.addPage([595, 842]); // A4
   const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
@@ -248,11 +239,9 @@ export async function PUT(req: Request) {
     y -= lineHeight;
   }
 
-  // Titre
   page.drawText('Déclaration d\'affaire SNCF', { x: left, y, size: 18, font, color: rgb(0,0,0.7) });
   y -= 2*lineHeight;
 
-  // Champs principaux
   drawText('Nom du projet', data.projectName);
   drawText('ID projet', data.projectId);
   drawText('Résumé', data.summary);
@@ -274,7 +263,6 @@ export async function PUT(req: Request) {
     }
   }
 
-  // Risques
   if (data.risks?.length) {
     page.drawText('Risques :', { x: left, y, size: 13, font, color: rgb(0.5,0,0) });
     y -= lineHeight;
@@ -283,7 +271,6 @@ export async function PUT(req: Request) {
     }
   }
 
-  // Livrables
   if (data.deliverables?.length) {
     page.drawText('Livrables :', { x: left, y, size: 13, font, color: rgb(0,0.3,0) });
     y -= lineHeight;
@@ -292,7 +279,6 @@ export async function PUT(req: Request) {
     }
   }
 
-  // Contacts
   if (data.contacts?.length) {
     page.drawText('Contacts :', { x: left, y, size: 13, font, color: rgb(0,0,0.3) });
     y -= lineHeight;
@@ -302,11 +288,9 @@ export async function PUT(req: Request) {
     }
   }
 
-  // Légal et commentaires
   drawText('Mentions légales', data.legal);
   drawText('Commentaires', data.comments);
 
-  // Finalisation
   const pdfBytes = await pdfDoc.save();
   return new Response(Buffer.from(pdfBytes), {
     status: 200,

@@ -52,7 +52,6 @@ const initialWidgets = [
   { id: 5, type: "txt" },
 ]
 
-// Hook personnalisé pour la gestion des widgets et de leur état
 function useWidgetState(initialWidgets: { id: number, type: string }[] = []) {
   const [widgets, setWidgets] = useState<{ id: number, type: string }[]>(initialWidgets)
   const [nextWidgetId, setNextWidgetId] = useState(initialWidgets.length + 1)
@@ -105,7 +104,6 @@ function useWidgetState(initialWidgets: { id: number, type: string }[] = []) {
   }
 }
 
-// Composant utilitaire pour un graphique avec export PNG
 function ChartWithExport({ chartType, chartData, chartOptions, title, explanation, axes, children }: {
   chartType: 'bar' | 'line' | 'pie',
   chartData: any,
@@ -129,10 +127,8 @@ function ChartWithExport({ chartType, chartData, chartOptions, title, explanatio
   if (chartType === 'bar') ChartComponent = <Bar ref={chartRef} data={chartData} options={chartOptions} />;
   else if (chartType === 'line') ChartComponent = <Line ref={chartRef} data={chartData} options={chartOptions} />;
   else if (chartType === 'pie') {
-    // Robustesse Pie chart
     const labels = Array.isArray(chartData.labels) ? chartData.labels.filter((l: string) => l !== null && l !== undefined && l !== "") : [];
     const dataArr = Array.isArray(chartData.datasets?.[0]?.data) ? chartData.datasets[0].data.map((v: number) => (typeof v === 'number' && !isNaN(v) ? v : 0)) : [];
-    // Debug affichage
     const debug = true;
     if (debug) {
       ChartComponent = <div className="mb-2 text-xs text-gray-500">Labels: {JSON.stringify(labels)}<br/>Data: {JSON.stringify(dataArr)}</div>;
@@ -169,7 +165,6 @@ function ChartWithExport({ chartType, chartData, chartOptions, title, explanatio
   );
 }
 
-// Sous-composant pour un widget d'analyse
 function WidgetCard({
   widget,
   color,
@@ -203,7 +198,6 @@ function WidgetCard({
   onDownloadSummary: (id: number) => void,
   getChartData: (res: any) => ChartData<'bar', any, unknown> | undefined
 }) {
-  // Pour Excel : mémoriser l'index du graphique sélectionné pour chaque item (fichier)
   const [selectedChartIdxs, setSelectedChartIdxs] = useState<Record<number, number>>({});
   const [customChartQueries, setCustomChartQueries] = useState<Record<number, string>>({});
   const [customChartLoading, setCustomChartLoading] = useState<Record<number, boolean>>({});
@@ -443,7 +437,6 @@ function WidgetCard({
             )}
           </div>
         )}
-        {/* Rendu pour les autres types de widgets */}
         {widget.type === "excel" && res && (
           <div className="mt-6 space-y-6">
             <h3 className="text-green-900 font-bold text-lg mb-2 flex items-center gap-2">
@@ -455,7 +448,6 @@ function WidgetCard({
                 const charts = item.charts || [];
                 const selectedChartIdx = selectedChartIdxs[idx] || 0;
                 const selectedChart = charts[selectedChartIdx];
-                // Préparation des données pour chaque type de graphique
                 let chartComponent = null;
                 let labels: string[] = [];
                 let values: number[] = [];
@@ -581,7 +573,6 @@ function WidgetCard({
                             </table>
                           </div>
                         )}
-                        {/* Choix du graphique à afficher */}
                         {charts.length > 0 && (
                           <div className="mb-4">
                             <div className="flex flex-wrap gap-2 mb-2">
@@ -849,7 +840,6 @@ function WidgetCard({
                           </div>
                           {incoherence && <span className="text-red-700 font-semibold ml-4">Incohérence détectée !</span>}
                         </div>
-                        {/* Tableau des lignes */}
                         {item.lignes && Array.isArray(item.lignes) && item.lignes.length > 0 && (
                           <div className="overflow-x-auto mb-2">
                             <table className="min-w-full border text-xs bg-white">
@@ -910,7 +900,6 @@ function WidgetCard({
   )
 }
 
-// Composant modal d'upload de fichiers
 function UploadModal({
   show,
   onClose,
@@ -995,10 +984,8 @@ export default function AiDashboardPage() {
     setWidgetError,
   } = useWidgetState([])
   const [addType, setAddType] = useState<string>("global")
-  // New: upload modal state (placeholder)
   const [showUpload, setShowUpload] = useState(false)
   const [exporting, setExporting] = useState(false)
-  // Upload state
   const [uploading, setUploading] = useState(false)
   const [uploadError, setUploadError] = useState<string|null>(null)
   const [uploadSuccess, setUploadSuccess] = useState(false)
@@ -1016,7 +1003,6 @@ export default function AiDashboardPage() {
     fetchDocuments()
   }, [])
 
-  // New: refresh documents
   const handleRefreshDocs = async () => {
     setWidgetLoading('global' as any, true)
     const res = await fetch("/api/documents")
@@ -1025,9 +1011,8 @@ export default function AiDashboardPage() {
     setWidgetLoading('global' as any, false)
   }
 
-  // Analyse par widget
   const handleAnalyze = async (id: number, type: string) => {
-    setShowSelection(false); // Ferme la sélection
+    setShowSelection(false); 
     setWidgetLoading(id, true)
     setWidgetError(id, null)
     setWidgetResult(id, null)
@@ -1053,7 +1038,6 @@ export default function AiDashboardPage() {
     }
   }
 
-  // Filtres de fichiers par type de widget
   const getDocsForWidget = (type: string) => {
     if (type === "global") return documents
     if (type === "devis") return documents.filter(doc => doc.name.toLowerCase().includes("devis") && ["pdf","doc","docx","txt"].includes(doc.type.toLowerCase()))
@@ -1076,7 +1060,6 @@ export default function AiDashboardPage() {
     URL.revokeObjectURL(url)
   }
 
-  // Chart data pour global
   const getChartData = (res: any): ChartData<'bar', any, unknown> | undefined => {
     if (res?.kpis && res.kpis.length > 0) {
       return {
@@ -1093,7 +1076,6 @@ export default function AiDashboardPage() {
     return undefined
   }
 
-  // New: export all (ZIP)
   const handleExportAll = async () => {
     if (exporting) return
     setExporting(true)
@@ -1119,7 +1101,6 @@ export default function AiDashboardPage() {
       setExporting(false)
     }
   }
-  // Upload handler
   const handleUpload = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     setUploadError(null)
@@ -1152,7 +1133,6 @@ export default function AiDashboardPage() {
       setUploading(false)
     }
   }
-  // Drag & drop handlers
   const handleDrag = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     e.stopPropagation();
@@ -1183,7 +1163,6 @@ export default function AiDashboardPage() {
 
   return (
     <Layout title="Dashboard IA" subtitle="Analyse intelligente de vos documents projet">
-      {/* Sticky header ultra-pro */}
       <header className="sticky top-0 z-30 bg-white/90 backdrop-blur flex items-center justify-between px-6 py-3 shadow-sm border-b border-gray-100 max-w-5xl mx-auto w-full">
         <div className="flex items-center gap-3">
           <BarChart3 className="h-8 w-8 text-blue-600" />
@@ -1201,7 +1180,6 @@ export default function AiDashboardPage() {
           </Button>
         </div>
       </header>
-      {/* Résumé explicatif */}
       <section className="bg-blue-50/60 border-b border-blue-100 px-6 py-6 max-w-5xl mx-auto w-full">
         <div className="max-w-3xl mx-auto text-center">
           <h2 className="text-lg font-semibold text-blue-800 mb-2">À propos du Dashboard IA</h2>
@@ -1210,7 +1188,6 @@ export default function AiDashboardPage() {
           </p>
         </div>
       </section>
-      {/* Section widgets */}
       <main className="mx-auto max-w-full py-8 px-2 w-full flex flex-row justify-end">
         <div className="flex flex-col gap-8 w-full max-w-4xl items-end pr-4">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8 w-full">
@@ -1229,7 +1206,6 @@ export default function AiDashboardPage() {
               <Button onClick={handleRefreshDocs} variant="ghost" className="flex items-center gap-1 h-10 text-base font-medium"><RefreshCw className="h-5 w-5" /> Rafraîchir</Button>
             </div>
           </div>
-          {/* Widgets colonne droite */}
           {widgets.length === 0 && (
             <div className="flex flex-col items-center justify-center text-center text-gray-400 text-base py-24 border-2 border-dashed border-blue-100 rounded-xl bg-blue-50/40 w-full">
               <BarChart3 className="h-14 w-14 mx-auto mb-4 text-blue-200" />
@@ -1258,7 +1234,6 @@ export default function AiDashboardPage() {
           ))}
         </div>
       </main>
-      {/* Upload modal placeholder */}
       <UploadModal
         show={showUpload}
         onClose={handleCloseUpload}
