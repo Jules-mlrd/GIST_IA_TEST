@@ -204,7 +204,6 @@ export default function DeclarationAffairePage() {
     }
   };
 
-  // Remplacer handleAnalyze pour utiliser le cache
   const handleAnalyze = async () => {
     setAnalyzing(true);
     setAnalyzeError("");
@@ -231,26 +230,22 @@ export default function DeclarationAffairePage() {
     }
   };
 
-  // Bouton pour reset le cache
   const handleResetCache = () => {
     setResetting(true);
     try {
       if (typeof window !== 'undefined') {
-        // Supprimer toutes les entrées de cache déclaration d'affaire
         Object.keys(localStorage).forEach(key => {
           if (key.startsWith(DECLARATION_CACHE_KEY)) {
             localStorage.removeItem(key);
           }
         });
       }
-      // Réinitialiser le formulaire
       setFields(defaultFields);
     } finally {
       setResetting(false);
     }
   };
 
-  // Export PDF (réel)
   const handleExportPDF = async () => {
     try {
       const res = await fetch("/api/declaration-affaire", {
@@ -279,14 +274,12 @@ export default function DeclarationAffairePage() {
         <h1 className="text-3xl font-bold mb-2">Déclaration d'affaire</h1>
         <p className="text-gray-600 mb-6">Remplissez ou laissez l'IA compléter automatiquement la fiche projet à partir de vos documents.</p>
 
-        {/* Feedback fusion IA si applicable */}
         {fusionNotice && (
           <div className="mb-4 p-3 bg-green-50 border border-green-300 rounded text-green-900">
             {fixEncoding(fusionNotice)}
           </div>
         )}
 
-        {/* Feedback fichiers sélectionnés */}
         {selectedS3Keys.length > 0 && (
           <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded">
             <div className="font-semibold text-blue-700 mb-1">Fichiers sélectionnés :</div>
@@ -298,14 +291,12 @@ export default function DeclarationAffairePage() {
           </div>
         )}
 
-        {/* Notice de résumé IA si applicable */}
         {summarizationNotice && (
           <div className="mb-4 p-3 bg-yellow-50 border border-yellow-300 rounded text-yellow-900">
             {summarizationNotice}
           </div>
         )}
 
-        {/* Section 1 : Fichiers S3 */}
         <section className="bg-white border rounded-lg p-4 shadow-sm">
           <h2 className="font-semibold mb-2">1. Sélectionner des fichiers du projet (S3)</h2>
           {loadingS3 ? <div className="text-gray-500">Chargement...</div> : null}
@@ -325,7 +316,6 @@ export default function DeclarationAffairePage() {
           </div>
         </section>
 
-        {/* Section 2 : Upload manuel */}
         <section className="bg-white border rounded-lg p-4 shadow-sm">
           <h2 className="font-semibold mb-2">2. Importer des fichiers manuellement</h2>
           <Input type="file" multiple onChange={handleFileChange} ref={fileInputRef} />
@@ -337,7 +327,6 @@ export default function DeclarationAffairePage() {
           {uploadError && <div className="text-red-500">{uploadError}</div>}
         </section>
 
-        {/* Section 3 : Analyse IA */}
         <section className="bg-white border rounded-lg p-4 shadow-sm flex flex-col gap-2">
           <div className="flex gap-2 mb-4">
             <Button onClick={handleAnalyze} disabled={analyzing || (selectedS3Keys.length === 0 && files.length === 0)}>
@@ -350,7 +339,6 @@ export default function DeclarationAffairePage() {
           {analyzeError && <div className="text-red-500">{analyzeError}</div>}
         </section>
 
-        {/* Section 4 : Formulaire projet */}
         <section className="bg-white border rounded-lg p-4 shadow-sm">
           <h2 className="font-semibold mb-4">4. Fiche projet</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -361,7 +349,6 @@ export default function DeclarationAffairePage() {
           </div>
           <Textarea className="mt-4" placeholder="Résumé du projet" value={fields.summary} onChange={e => setFields(f => ({ ...f, summary: e.target.value }))} />
 
-          {/* Chef de projet */}
           <div className="mt-4">
             <label className="font-medium">Chef de projet</label>
             <div className="flex gap-2 mt-1">
