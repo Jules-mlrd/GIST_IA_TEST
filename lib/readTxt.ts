@@ -1,8 +1,8 @@
+// lib/readTxt.ts
 import fs from 'fs'
 import path from 'path'
 import s3 from "./s3Client";
 import { GetObjectCommand, ListObjectsV2Command } from "@aws-sdk/client-s3";
-import * as cheerio from "cheerio";
 
 export function readTxtContent(): string {
   const txtFolder = path.join(process.cwd(), 'public', 'document')
@@ -56,17 +56,5 @@ export async function fetchTxtContentFromS3(bucketName: string, fileKey: string)
   } catch (error) {
     console.error('Error fetching TXT from S3:', error);
     throw new Error('Failed to fetch TXT from S3.');
-  }
-}
-
-export async function fetchHtmlTextFromS3(bucketName: string, fileKey: string): Promise<string> {
-  try {
-    const html = await fetchTxtContentFromS3(bucketName, fileKey);
-    const $ = cheerio.load(html);
-    // On extrait le texte du body, ou tout le texte si besoin
-    return $("body").text() || $.text();
-  } catch (error) {
-    console.error('Error fetching HTML from S3:', error);
-    throw new Error('Failed to fetch HTML from S3.');
   }
 }
