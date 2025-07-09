@@ -10,7 +10,6 @@ const inter = Inter({ subsets: ["latin"] })
 export const metadata: Metadata = {
   title: "GIST Connect - Assistant IA pour projets",
   description: "Interface intelligente pour la gestion et le support de projets GIST",
-  generator: "v0.dev",
 }
 
 export default function RootLayout({

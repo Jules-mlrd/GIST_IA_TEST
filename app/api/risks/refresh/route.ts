@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { listPdfFilesInS3, fetchPdfTextFromS3 } from '@/lib/readPdf';
-import { listTxtFilesInS3, fetchTxtContentFromS3, fetchHtmlTextFromS3 } from '@/lib/readTxt';
+import { listTxtFilesInS3, fetchTxtContentFromS3 } from '@/lib/readTxt';
 import { extractRisksWithLLM } from '@/lib/utils';
 import fs from 'fs';
 import path from 'path';
@@ -14,28 +14,21 @@ function writeExtractedRisks(risks: any[]) {
 
 export async function POST() {
   try {
-    // Extraction IA forcée
-    const [pdfFiles, txtFiles, htmlFiles] = await Promise.all([
+    const [pdfFiles, txtFiles] = await Promise.all([
       listPdfFilesInS3(BUCKET_NAME),
       listTxtFilesInS3(BUCKET_NAME),
-      listTxtFilesInS3(BUCKET_NAME.replace(/txt$/, 'html'))
     ]);
     const allFiles = [
       ...pdfFiles.map((key) => ({ key, type: 'pdf' })),
       ...txtFiles.map((key) => ({ key, type: 'txt' })),
-      ...htmlFiles.map((key) => ({ key, type: 'html' })),
     ];
     const texts = await Promise.all(
       allFiles.map(async ({ key, type }) => {
         try {
           if (type === 'pdf') {
             return await fetchPdfTextFromS3(BUCKET_NAME, key);
-          } else if (type === 'txt') {
-            return await fetchTxtContentFromS3(BUCKET_NAME, key);
-          } else if (type === 'html') {
-            return await fetchHtmlTextFromS3(BUCKET_NAME, key);
           } else {
-            return '';
+            return await fetchTxtContentFromS3(BUCKET_NAME, key);
           }
         } catch (e) {
           return '';

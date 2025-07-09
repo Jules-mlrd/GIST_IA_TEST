@@ -174,7 +174,6 @@ export default function RisksPage() {
     return !!risk.id
   }
 
-  // Filtrer les risques blacklistés (IA)
   const displayedRisks = risks.filter(risk => !blacklist.includes(risk.description))
 
   return (
