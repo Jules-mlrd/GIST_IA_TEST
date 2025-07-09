@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Popover } from "@/components/ui/popover"
+import Link from "next/link";
 
 export default function ProjectSelectionPage() {
   // Champs de filtrage
@@ -57,7 +58,7 @@ export default function ProjectSelectionPage() {
   const [etatLoading, setEtatLoading] = useState(false);
   useEffect(() => {
     setEtatLoading(true);
-    fetch("/api/etats")
+    fetch("/api/api_database/etats")
       .then(res => res.json())
       .then(data => {
         if (data.success) setEtatOptions(data.etats || []);
@@ -73,7 +74,7 @@ export default function ProjectSelectionPage() {
   const [typeDemandeLoading, setTypeDemandeLoading] = useState(false);
   useEffect(() => {
     setTypeDemandeLoading(true);
-    fetch("/api/types-demandes")
+    fetch("/api/api_database/types-demandes")
       .then(res => res.json())
       .then(data => {
         if (data.success) setTypeDemandeOptions(data.types || []);
@@ -91,7 +92,7 @@ export default function ProjectSelectionPage() {
   const [referentLoading, setReferentLoading] = useState(false);
   useEffect(() => {
     setReferentLoading(true);
-    fetch("/api/referents")
+    fetch("/api/api_database/referents")
       .then(res => res.json())
       .then(data => {
         if (data.success) setReferentOptions(data.referents || []);
@@ -107,7 +108,7 @@ export default function ProjectSelectionPage() {
   const [clientLoading, setClientLoading] = useState(false);
   useEffect(() => {
     setClientLoading(true);
-    fetch("/api/clients")
+    fetch("/api/api_database/clients")
       .then(res => res.json())
       .then(data => {
         if (data.success) setClientOptions(data.clients || []);
@@ -123,7 +124,7 @@ export default function ProjectSelectionPage() {
   const [contactLoading, setContactLoading] = useState(false);
   useEffect(() => {
     setContactLoading(true);
-    fetch("/api/contacts-moa")
+    fetch("/api/api_database/contacts-moa")
       .then(res => res.json())
       .then(data => {
         if (data.success) setContactOptions(data.contacts || []);
@@ -139,7 +140,7 @@ export default function ProjectSelectionPage() {
   const [porteurLoading, setPorteurLoading] = useState(false);
   useEffect(() => {
     setPorteurLoading(true);
-    fetch("/api/porteurs")
+    fetch("/api/api_database/porteurs")
       .then(res => res.json())
       .then(data => {
         if (data.success) setPorteurOptions(data.porteurs || []);
@@ -147,6 +148,38 @@ export default function ProjectSelectionPage() {
       .finally(() => setPorteurLoading(false));
   }, []);
   const filteredPorteurs = porteurOptions.filter(p => p.toLowerCase().includes(porteurInput.toLowerCase()));
+
+  const [guichetInput, setGuichetInput] = useState("");
+  const [guichetDropdown, setGuichetDropdown] = useState(false);
+  const guichetRef = useRef<HTMLInputElement>(null);
+  const [guichetOptions, setGuichetOptions] = useState<string[]>([]);
+  const [guichetLoading, setGuichetLoading] = useState(false);
+  useEffect(() => {
+    setGuichetLoading(true);
+    fetch("/api/api_database/guichets")
+      .then(res => res.json())
+      .then(data => {
+        if (data.success) setGuichetOptions(data.guichets || []);
+      })
+      .finally(() => setGuichetLoading(false));
+  }, []);
+  const filteredGuichets = guichetOptions.filter(g => g.toLowerCase().includes(guichetInput.toLowerCase()));
+
+  const [portefeuilleInput, setPortefeuilleInput] = useState("");
+  const [portefeuilleDropdown, setPortefeuilleDropdown] = useState(false);
+  const portefeuilleRef = useRef<HTMLInputElement>(null);
+  const [portefeuilleOptions, setPortefeuilleOptions] = useState<string[]>([]);
+  const [portefeuilleLoading, setPortefeuilleLoading] = useState(false);
+  useEffect(() => {
+    setPortefeuilleLoading(true);
+    fetch("/api/api_database/portefeuilles")
+      .then(res => res.json())
+      .then(data => {
+        if (data.success) setPortefeuilleOptions(data.portefeuilles || []);
+      })
+      .finally(() => setPortefeuilleLoading(false));
+  }, []);
+  const filteredPortefeuilles = portefeuilleOptions.filter(p => p.toLowerCase().includes(portefeuilleInput.toLowerCase()));
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const target = e.target as HTMLInputElement | HTMLSelectElement;
@@ -198,7 +231,7 @@ export default function ProjectSelectionPage() {
     setError(null)
     setResults([])
     try {
-      const res = await fetch("/api/project-selection-results", {
+      const res = await fetch("/api/api_database/project-selection-results", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(filters),
@@ -233,7 +266,7 @@ export default function ProjectSelectionPage() {
   const [anneeLoading, setAnneeLoading] = useState(false);
   useEffect(() => {
     setAnneeLoading(true);
-    fetch("/api/annees")
+    fetch("/api/api_database/annees")
       .then(res => res.json())
       .then(data => {
         if (data.success) setAnneeOptions(data.annees || []);
@@ -267,24 +300,35 @@ export default function ProjectSelectionPage() {
           <span className="font-bold text-lg text-gray-800">GIST</span>
           <div className="flex flex-wrap md:flex-nowrap gap-2 md:gap-4 overflow-x-auto">
             {[
-              "Accueil",
-              "Demandes",
-              "Affaires",
-              "Devis",
-              "Notes Travaux",
-              "Interventions",
-              "Rechercher",
-              "Suivi des affaires",
-              "Aide",
+              { label: "Accueil", href: "/help-center" },
+              { label: "Demandes", href: "/demandes" },
+              { label: "Affaires", href: "/project-selection" },
+              { label: "Devis" },
+              { label: "Notes Travaux" },
+              { label: "Interventions" },
+              { label: "Rechercher" },
+              { label: "Suivi des affaires" },
+              { label: "Aide" },
             ].map((item) => (
-              <button
-                key={item}
-                type="button"
-                className="bg-transparent border-none px-2 py-1 text-gray-700 hover:text-gist-blue hover:underline transition-colors font-medium text-sm md:text-base cursor-pointer focus:outline-none"
-                style={{ outline: "none" }}
-              >
-                {item}
-              </button>
+              item.href ? (
+                <Link
+                  key={item.label}
+                  href={item.href}
+                  className="bg-transparent border-none px-2 py-1 text-gray-700 hover:text-gist-blue hover:underline transition-colors font-medium text-sm md:text-base cursor-pointer focus:outline-none"
+                  style={{ outline: "none" }}
+                >
+                  {item.label}
+                </Link>
+              ) : (
+                <button
+                  key={item.label}
+                  type="button"
+                  className="bg-transparent border-none px-2 py-1 text-gray-700 hover:text-gist-blue hover:underline transition-colors font-medium text-sm md:text-base cursor-pointer focus:outline-none"
+                  style={{ outline: "none" }}
+                >
+                  {item.label}
+                </button>
+              )
             ))}
           </div>
         </div>
@@ -389,14 +433,49 @@ export default function ProjectSelectionPage() {
                     <div className="absolute left-0 w-full mt-2 z-20 bg-white border border-gray-200 rounded-md shadow-lg px-3 py-2 text-gray-400 text-sm">Chargement...</div>
                   )}
                 </div>
-                {/* Guichet */}
-                <div className="flex flex-col gap-2">
+                {/* Guichet autocomplete */}
+                <div className="flex flex-col gap-2 relative">
                   <label htmlFor="guichet" className="text-gray-700 font-medium">Guichet</label>
-                  <select id="guichet" name="guichet" value={filters.guichet} onChange={handleChange} className="border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-gist-blue">
-                    <option value="">Sélectionnez un ou des guichets</option>
-                    <option value="guichet1">Guichet 1</option>
-                    <option value="guichet2">Guichet 2</option>
-                  </select>
+                  <input
+                    id="guichet"
+                    name="guichet"
+                    type="text"
+                    autoComplete="off"
+                    className="border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-gist-blue"
+                    placeholder="Tapez ou sélectionnez un guichet..."
+                    value={guichetInput}
+                    onChange={e => {
+                      setGuichetInput(e.target.value);
+                      setFilters({ ...filters, guichet: e.target.value });
+                      setGuichetDropdown(true);
+                    }}
+                    onFocus={() => setGuichetDropdown(true)}
+                    onBlur={() => setTimeout(() => setGuichetDropdown(false), 100)}
+                    ref={guichetRef}
+                  />
+                  {guichetDropdown && filteredGuichets.length > 0 && (
+                    <ul className="absolute left-0 w-full mt-2 z-20 bg-white bg-opacity-95 border border-gray-200 rounded-md shadow-lg max-h-40 overflow-auto">
+                      {filteredGuichets.map((option, idx) => (
+                        <li
+                          key={option}
+                          className={`px-3 py-2 cursor-pointer hover:bg-gist-blue/10 ${idx === 0 ? 'bg-gist-blue/10' : ''}`}
+                          onMouseDown={() => {
+                            setGuichetInput(option);
+                            setFilters({ ...filters, guichet: option });
+                            setGuichetDropdown(false);
+                          }}
+                        >
+                          {option}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                  {guichetDropdown && !guichetLoading && filteredGuichets.length === 0 && (
+                    <div className="absolute left-0 w-full mt-2 z-20 bg-white border border-gray-200 rounded-md shadow-lg px-3 py-2 text-gray-400 text-sm">Aucun guichet trouvé</div>
+                  )}
+                  {guichetDropdown && guichetLoading && (
+                    <div className="absolute left-0 w-full mt-2 z-20 bg-white border border-gray-200 rounded-md shadow-lg px-3 py-2 text-gray-400 text-sm">Chargement...</div>
+                  )}
                 </div>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-4 gap-6 w-full">
@@ -405,8 +484,10 @@ export default function ProjectSelectionPage() {
                   <label htmlFor="portefeuille" className="text-gray-700 font-medium">Portefeuille projet</label>
                   <select id="portefeuille" name="portefeuille" value={filters.portefeuille} onChange={handleChange} className="border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-gist-blue">
                     <option value="">Tous</option>
-                    <option value="port1">Portefeuille 1</option>
-                    <option value="port2">Portefeuille 2</option>
+                    {portefeuilleLoading && <option disabled>Chargement...</option>}
+                    {!portefeuilleLoading && portefeuilleOptions.map((p) => (
+                      <option key={p} value={p}>{p}</option>
+                    ))}
                   </select>
                 </div>
                 {/* Client autocomplete */}
@@ -453,7 +534,7 @@ export default function ProjectSelectionPage() {
                     <div className="absolute left-0 w-full mt-2 z-20 bg-white border border-gray-200 rounded-md shadow-lg px-3 py-2 text-gray-400 text-sm">Chargement...</div>
                   )}
                 </div>
-                {/* Contact MOA/MOEG */}
+                {/* Contact MOA/MOEG autocomplete */}
                 <div className="flex flex-col gap-2 relative">
                   <label htmlFor="contact" className="text-gray-700 font-medium">Contact MOA/MOEG</label>
                   <input
@@ -634,6 +715,16 @@ export default function ProjectSelectionPage() {
                     </button>
                     {anneePopover && !anneeLoading && (
                       <div className="absolute left-0 w-full mt-2 z-20 bg-white border border-gray-200 rounded-md shadow-lg p-2 grid grid-cols-3 gap-2 max-h-60 overflow-auto">
+                        <button
+                          type="button"
+                          className="col-span-3 mb-2 px-2 py-1 rounded text-xs font-medium text-gray-500 hover:text-red-500 hover:bg-gray-100 border border-transparent hover:border-red-300 transition"
+                          onClick={() => {
+                            setFilters({ ...filters, annee: "" });
+                            setAnneePopover(false);
+                          }}
+                        >
+                          ✕ Aucune année
+                        </button>
                         {anneeOptions.map((year) => (
                           <button
                             key={year}

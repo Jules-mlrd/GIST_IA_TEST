@@ -10,10 +10,10 @@ export async function GET(req: NextRequest) {
       password: 'DevMySQL2024!',
       database: 'gestion_affaires',
     });
-    const [rows] = await connection.execute('SELECT DISTINCT contact_moa_moeg FROM affaires WHERE contact_moa_moeg IS NOT NULL AND contact_moa_moeg != "" ORDER BY contact_moa_moeg ASC');
+    const [rows] = await connection.execute('SELECT DISTINCT guichet FROM affaires WHERE guichet IS NOT NULL AND guichet != "" ORDER BY guichet ASC');
     await connection.end();
-    const contacts = (rows as any[]).map(r => r.contact_moa_moeg);
-    return NextResponse.json({ success: true, contacts });
+    const guichets = (rows as any[]).map(r => r.guichet);
+    return NextResponse.json({ success: true, guichets });
   } catch (error: any) {
     return NextResponse.json({ success: false, error: error.message });
   }
