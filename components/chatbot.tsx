@@ -1,441 +1,338 @@
-"use client"
-
-import type React from "react"
-
-import { useState, useRef, useEffect } from "react"
-import { MessageSquare, Send, X, Loader2, Info, Copy, ExternalLink } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { ScrollArea } from "@/components/ui/scroll-area"
-import { Avatar, AvatarFallback } from "@/components/ui/avatar"
-import { Badge } from "@/components/ui/badge"
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+"use client";
+import { useState, useRef, useEffect } from "react";
+import { MessageSquare, Send, X, Loader2, FileText, CheckCircle, XCircle, Info } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { useToast } from "@/hooks/use-toast";
 
 type Message = {
-  id: string
-  content: string
-  sender: "user" | "bot"
-  timestamp: Date
-}
-
-type UploadedFile = {
-  file: File;
-  status: 'pending' | 'uploading' | 'uploaded' | 'error';
-  s3Key?: string;
-  error?: string;
+  id: string;
+  content: string;
+  sender: "user" | "bot";
+  timestamp: Date;
 };
 
-function getOrCreateUserId() {
-  if (typeof window === 'undefined') return 'default';
-  let userId = localStorage.getItem("sncf-chatbot-userId");
-  if (!userId) {
-    userId = "user-" + Math.random().toString(36).slice(2) + Date.now();
-    localStorage.setItem("sncf-chatbot-userId", userId);
-  }
-  return userId;
-}
+type FileMeta = {
+  key: string;
+  name: string;
+  type: string;
+  size: number;
+  lastModified: string;
+  downloadUrl: string;
+};
 
-export function ChatBot() {
-  const [isOpen, setIsOpen] = useState(false)
-  const [messages, setMessages] = useState<Message[]>([
-    // Pas de message d'accueil
-  ])
-  const [inputValue, setInputValue] = useState("")
-  const [isTyping, setIsTyping] = useState(false)
-  const [suggestions, setSuggestions] = useState<string[]>([])
-  const [explicabilityMap, setExplicabilityMap] = useState<{ [id: string]: any }>({})
-  const [openExplicabilityId, setOpenExplicabilityId] = useState<string | null>(null)
-  const messagesEndRef = useRef<HTMLDivElement>(null)
-  const userId = getOrCreateUserId();
-  const [similarPast, setSimilarPast] = useState<any>(null)
-  const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([])
-  const fileInputRef = useRef<HTMLInputElement>(null)
-  // Ajoute un état pour la notification de copie
-  const [copied, setCopied] = useState(false);
+type IndexingStatus = "idle" | "indexing" | "success" | "error";
+
+type Props = {
+  affaireId: string;
+  files: FileMeta[];
+  loading: boolean;
+};
+
+export function ChatBot({ affaireId, files, loading }: Props) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [inputValue, setInputValue] = useState("");
+  const [isTyping, setIsTyping] = useState(false);
+  const [selectedFiles, setSelectedFiles] = useState<string[]>([]);
+  const [indexingStatus, setIndexingStatus] = useState<Record<string, IndexingStatus>>({});
+  const [showFileIndexing, setShowFileIndexing] = useState(false);
+  const messagesEndRef = useRef<HTMLDivElement | null>(null);
+  const { toast } = useToast();
+  const cardRef = useRef<HTMLDivElement | null>(null);
+
+  // Gestion du clic en dehors pour refermer le ChatBot
+  useEffect(() => {
+    if (!isOpen) return;
+    function handleClickOutside(event: MouseEvent) {
+      if (cardRef.current && !cardRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [isOpen]);
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
-  }, [messages])
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
 
-  const uploadFileToS3 = async (file: File, index: number) => {
-    setUploadedFiles((prev) => prev.map((uf, i) => i === index ? { ...uf, status: 'uploading' } : uf));
-    const formData = new FormData();
-    formData.append('file', file);
-    try {
-      const res = await fetch('/api/upload', {
-        method: 'POST',
-        body: formData,
-      });
-      if (!res.ok) {
-        const err = await res.text();
-        throw new Error(err);
+  useEffect(() => {
+    // Initial summary is no longer a prop, so we don't set it here.
+    // If the user wants to trigger a summary, they will ask for it.
+  }, [affaireId]);
+
+  const handleFileSelect = (fileKey: string, checked: boolean) => {
+    setSelectedFiles(prev => checked ? [...prev, fileKey] : prev.filter(k => k !== fileKey));
+  };
+
+  const handleIndexFiles = async () => {
+    for (const fileKey of selectedFiles) {
+      setIndexingStatus(prev => ({ ...prev, [fileKey]: 'indexing' }));
+      try {
+        const res = await fetch(`/api/index-files/${affaireId}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ files: [fileKey] }),
+        });
+        if (!res.ok) throw new Error('Erreur indexation');
+        setIndexingStatus(prev => ({ ...prev, [fileKey]: 'success' }));
+        toast({ title: 'Indexation réussie', description: `${fileKey} indexé avec succès.`, variant: 'default' });
+      } catch {
+        setIndexingStatus(prev => ({ ...prev, [fileKey]: 'error' }));
+        toast({ title: 'Erreur indexation', description: `Erreur lors de l'indexation de ${fileKey}.`, variant: 'destructive' });
       }
-      const data = await res.json();
-      setUploadedFiles((prev) => prev.map((uf, i) => i === index ? { ...uf, status: 'uploaded', s3Key: data.fileName } : uf));
-    } catch (error: any) {
-      setUploadedFiles((prev) => prev.map((uf, i) => i === index ? { ...uf, status: 'error', error: error?.message || 'Erreur upload' } : uf));
     }
   };
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (files && files.length > 0) {
-      const newFiles: UploadedFile[] = Array.from(files).map((file) => ({ file, status: 'pending' }));
-      setUploadedFiles((prev) => {
-        const startIdx = prev.length;
-        const allFiles = [...prev, ...newFiles];
-        newFiles.forEach((uf, i) => uploadFileToS3(uf.file, startIdx + i));
-        return allFiles;
-      });
-    }
-    e.target.value = ''
-  }
-
-  const handleRemoveFile = (index: number) => {
-    setUploadedFiles((prev) => prev.filter((_, i) => i !== index));
-  }
-
   const handleSendMessage = async () => {
-    if (!inputValue.trim()) return
-
+    if (!inputValue.trim()) return;
     const userMessage: Message = {
       id: `user-${Date.now()}`,
       content: inputValue,
       sender: "user",
       timestamp: new Date(),
-    }
-    
-    setMessages((prev) => [...prev, userMessage])
-    const currentMessage = inputValue
-    setInputValue("")
-    setIsTyping(true)
+    };
+    setMessages(prev => [...prev, userMessage]);
+    setInputValue("");
+    setIsTyping(true);
 
-    // Ajout : détection demande de résumé d'affaire
-    const resumeRegex = /résum[ée] (?:de |l'|du |d’)?affaire ([A-Za-z0-9\-_]+)/i;
-    const match = currentMessage.match(resumeRegex);
-    if (match) {
-      const numeroAffaire = match[1];
+    // Détection de demande de résumé d'affaire
+    const resumeRegex = /résum[ée]( moi| de| l'| du| d’)?( l'?affaire| projet| ce projet| cette affaire)?/i;
+    const resumeDocRegex = /résum[ée].*(devis|mail|conversation|échange|courriel|facture|rapport|compte[- ]?rendu|note)/i;
+    if ((resumeRegex.test(userMessage.content) || resumeDocRegex.test(userMessage.content)) && affaireId) {
       try {
-        const response = await fetch(`/api/api_database/affaires/summary?numero_affaire=${encodeURIComponent(numeroAffaire)}`);
-        if (!response.ok) {
-          const errorText = await response.text();
-          throw new Error(errorText || 'Erreur API résumé affaire');
+        let data;
+        // Cas avancé : résumé d'un type de document (devis, mail, etc.)
+        if (resumeDocRegex.test(userMessage.content)) {
+          // Recherche sémantique du fichier le plus pertinent
+          const searchRes = await fetch(`/api/semantic-search/${affaireId}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ query: userMessage.content }),
+          });
+          const searchData = await searchRes.json();
+          if (searchData.results && searchData.results.length > 0) {
+            // Prendre le texte du fichier le plus pertinent
+            const bestFile = searchData.results[0];
+            // Construire un prompt contextuel
+            const prompt = `Contexte de l'affaire :\n${affaireId}\n\nContenu du fichier pertinent (${bestFile.fileKey}) :\n${bestFile.text}\n\nRésume ce document de façon synthétique et structurée pour un chef de projet SNCF.`;
+            // Appel à l'API de résumé
+            const resp = await fetch(`/api/summary/${affaireId}`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ html: prompt }),
+            });
+            data = await resp.json();
+          } else {
+            data = { summary: "Aucun fichier pertinent trouvé pour cette demande." };
+          }
+        } else if (selectedFiles.length > 0) {
+          const response = await fetch(`/api/summary/${affaireId}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ files: selectedFiles }),
+          });
+          data = await response.json();
+        } else {
+          const response = await fetch(`/api/summary/${affaireId}`);
+          data = await response.json();
         }
-        const data = await response.json();
-        const botMessage: Message = {
-          id: `bot-${Date.now()}`,
-          content: data.summary
-            ? `<b>Résumé de l'affaire <a href="/project-selection?numero_affaire=${encodeURIComponent(numeroAffaire)}" class="underline text-gist-blue" target="_blank">${numeroAffaire}</a></b><br><br>${data.summary}`
-            : 'Aucun résumé généré.',
-          sender: "bot",
-          timestamp: new Date(),
-        }
-        setMessages((prev) => [...prev, botMessage])
-        setSuggestions([])
-        setExplicabilityMap((prev) => ({ ...prev, [botMessage.id]: null }))
-        setSimilarPast(null)
-      } catch (error: any) {
-        const errorMessage: Message = {
-          id: `bot-${Date.now()}`,
-          content: `Erreur lors de la génération du résumé : ${error?.message || 'Erreur inconnue'}`,
-          sender: "bot",
-          timestamp: new Date(),
-        }
-        setMessages((prev) => [...prev, errorMessage])
-        setSuggestions([])
-        setExplicabilityMap((prev) => ({ ...prev, [userMessage.id]: null }))
-        setSimilarPast(null)
+        setMessages(prev => [
+          ...prev,
+          {
+            id: `bot-summary-${Date.now()}`,
+            content: data.summary || "Aucun résumé généré.",
+            sender: "bot",
+            timestamp: new Date(),
+          },
+        ]);
+      } catch (error) {
+        setMessages(prev => [
+          ...prev,
+          {
+            id: `bot-summary-${Date.now()}`,
+            content: `Erreur lors de la génération du résumé : ${error instanceof Error ? error.message : 'Erreur inconnue'}`,
+            sender: "bot",
+            timestamp: new Date(),
+          },
+        ]);
       } finally {
-        setIsTyping(false)
+        setIsTyping(false);
       }
       return;
     }
 
     try {
-      console.log('Envoi du message:', currentMessage)
-      const uploadedS3Keys = uploadedFiles.filter(f => f.status === 'uploaded' && f.s3Key).map(f => f.s3Key);
       const response = await fetch('/api/chat', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          message: currentMessage,
-          userId,
-          files: uploadedS3Keys,
+          message: userMessage.content,
+          userId: "default",
+          affaireId,
         }),
-      })
-
-      console.log('Status de la réponse:', response.status)
-
-      if (!response.ok) {
-        const errorText = await response.text()
-        console.error('Erreur API:', errorText)
-        throw new Error(`Erreur API: ${response.status}`)
-      }
-
-      const data = await response.json()
-      console.log('Données reçues:', data)
-      
-      const botMessage: Message = {
+      });
+      if (!response.ok) throw new Error('Erreur API');
+      const data = await response.json();
+      setMessages(prev => [...prev, {
         id: `bot-${Date.now()}`,
         content: data.reply || 'Pas de réponse reçue',
         sender: "bot",
         timestamp: new Date(),
-      }
-
-      setMessages((prev) => [...prev, botMessage])
-      setSuggestions(Array.isArray(data.suggestions) ? data.suggestions : [])
-      setExplicabilityMap((prev) => ({ ...prev, [botMessage.id]: data.explicability || null }))
-      setSimilarPast(data.similarPast || null)
+      }]);
     } catch (error) {
-      console.error('Erreur dans handleSendMessage:', error)
-      
-      const errorMessage: Message = {
+      setMessages(prev => [...prev, {
         id: `bot-${Date.now()}`,
         content: `Erreur: ${error instanceof Error ? error.message : 'Erreur inconnue'}`,
         sender: "bot",
         timestamp: new Date(),
-      }
-      
-      setMessages((prev) => [...prev, errorMessage])
-      setSuggestions([])
-      setExplicabilityMap((prev) => ({ ...prev, [messages[messages.length-1]?.id || '']: null }))
-      setSimilarPast(null)
+      }]);
     } finally {
-      setIsTyping(false)
+      setIsTyping(false);
     }
-  }
+  };
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault()
-      handleSendMessage()
+      e.preventDefault();
+      handleSendMessage();
     }
-  }
+  };
 
   return (
     <div className="fixed bottom-6 right-6 z-50">
       {isOpen && (
-        <Card className="w-80 md:w-96 h-[500px] mb-4 shadow-lg border-sncf-red">
-          <CardHeader className="bg-sncf-red text-white py-3 px-4 flex flex-row items-center justify-between">
-            <div>
-              <CardTitle className="text-sm flex items-center gap-2">
-                <MessageSquare className="h-4 w-4" />
-                {/* Pas de description d'aide */}
-              </CardTitle>
-            </div>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-6 w-6 rounded-full text-white hover:bg-red-700 hover:text-white"
-              onClick={() => setIsOpen(false)}
-            >
+        <Card ref={cardRef} className="w-96 h-[600px] mb-4 shadow-lg border-sncf-red flex flex-col cursor-pointer" onClick={e => e.stopPropagation()}>
+          <CardHeader className="bg-sncf-red text-white flex items-center justify-between">
+            <CardTitle className="flex items-center gap-2">
+              <MessageSquare className="h-5 w-5" />
+              <span>Assistant IA GIST</span>
+            </CardTitle>
+            <Button variant="ghost" size="icon" onClick={() => setIsOpen(false)}>
               <X className="h-4 w-4" />
             </Button>
           </CardHeader>
-          <CardContent className="p-0 flex flex-col h-[calc(500px-56px)]">
-            <ScrollArea className="flex-1 p-4">
-              <div className="space-y-4">
-                {messages.map((message, idx) => (
-                  <div
-                    key={message.id}
-                    className={`flex ${message.sender === "user" ? "justify-end" : "justify-start"}`}
+          <CardContent className="flex-1 flex flex-col p-0">
+            {/* Résumé initial */}
+            <div className="p-4 pb-2">
+              {loading ? (
+                <div className="bg-blue-50 border border-blue-200 rounded p-3 text-sm flex items-center gap-2">
+                  <Loader2 className="h-4 w-4 animate-spin text-blue-400" />
+                  <span>Chargement du résumé…</span>
+                </div>
+              ) : (
+                null
+              )}
+            </div>
+            {/* Fichiers associés (bouton puis liste au clic) */}
+            <div className="px-4">
+              <div className="bg-gray-50 border border-gray-200 rounded p-3 mb-2">
+                <div className="font-semibold mb-2 flex items-center gap-2">
+                  <FileText className="h-4 w-4" /> Fichiers associés
+                </div>
+                {!showFileIndexing ? (
+                  <Button
+                    size="sm"
+                    className="bg-sncf-red text-white"
+                    onClick={() => setShowFileIndexing(true)}
                   >
-                    <div
-                      className={`max-w-[80%] rounded-lg p-3 ${
-                        message.sender === "user" ? "bg-sncf-red text-white" : "bg-gray-100 text-gray-800"
-                      }`}
-                    >
-                      {message.sender === "bot" && (
-                        <div className="flex items-center gap-2 mb-1">
-                          <Avatar className="h-5 w-5">
-                            <AvatarFallback className="text-[10px] bg-red-100 text-sncf-red">IA</AvatarFallback>
-                          </Avatar>
-                          <span className="text-xs font-medium">Assistant SNCF</span>
+                    Indexer des fichiers
+                  </Button>
+                ) : (
+                  <>
+                    <ul className="space-y-1">
+                      {files.map(file => (
+                        <li key={file.key} className="flex items-center gap-2 text-xs">
+                          <input
+                            type="checkbox"
+                            checked={selectedFiles.includes(file.key)}
+                            onChange={e => handleFileSelect(file.key, e.target.checked)}
+                          />
+                          <span>{file.name}</span>
+                          {indexingStatus[file.key] === 'indexing' && <Badge variant="outline" className="text-blue-600">En cours…</Badge>}
+                          {indexingStatus[file.key] === 'success' && <Badge variant="default" className="text-green-600">Indexé <CheckCircle className="inline h-3 w-3" /></Badge>}
+                          {indexingStatus[file.key] === 'error' && <Badge variant="destructive" className="text-red-600">Erreur <XCircle className="inline h-3 w-3" /></Badge>}
+                        </li>
+                      ))}
+                    </ul>
+                    <div className="flex items-center gap-2 mt-2">
+                      <Button
+                        size="sm"
+                        className="bg-sncf-red text-white"
+                        disabled={selectedFiles.length === 0 || Object.values(indexingStatus).includes('indexing')}
+                        onClick={handleIndexFiles}
+                      >
+                        Indexer la sélection
+                      </Button>
+                      <div className="relative group">
+                        <Info className="h-4 w-4 text-gray-500 ml-1 group-hover:text-sncf-red" />
+                        <div className="absolute left-1/2 -translate-x-1/2 top-full mt-2 w-64 bg-white border border-gray-300 rounded shadow-lg p-2 text-xs text-gray-700 z-50 opacity-0 group-hover:opacity-100 pointer-events-none group-hover:pointer-events-auto transition-opacity">
+                          Les fichiers sélectionnés seront analysés et indexés pour permettre au chatbot de répondre plus rapidement et précisément à vos questions sur leur contenu, sans relire les fichiers à chaque fois.
                         </div>
-                      )}
-                      <p className="text-sm whitespace-pre-wrap flex items-center gap-2">
-                        {message.sender === "bot" && message.content.includes('<a ') ? (
-                          (() => {
-                            const match = message.content.match(/affaire <a [^>]*>([^<]+)<\/a>/);
-                            const numero = match ? match[1] : null;
-                            const url = numero ? `/project-selection?numero_affaire=${encodeURIComponent(numero)}` : null;
-                            return (
-                              <div className="border border-gist-blue/30 rounded-lg bg-gist-blue/5 p-3 mb-1">
-                                <div className="flex items-center gap-2 mb-2">
-                                  <span dangerouslySetInnerHTML={{ __html: message.content.split('<br><br>')[0] }} />
-                                  {url && (
-                                    <>
-                                      <button
-                                        className="ml-2 px-2 py-1 text-xs rounded bg-gist-blue/10 text-gist-blue hover:bg-gist-blue/20 border border-gist-blue/20"
-                                        onClick={() => {
-                                          const summary = message.content.split('<br><br>')[1] || '';
-                                          navigator.clipboard.writeText(summary);
-                                          setCopied(true);
-                                          setTimeout(() => setCopied(false), 1200);
-                                        }}
-                                        title="Copier le résumé"
-                                      >
-                                        <Copy className="inline h-4 w-4 mr-1 align-text-bottom" /> Copier le résumé
-                                      </button>
-                                      <a
-                                        href={url}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="ml-2 px-2 py-1 text-xs rounded bg-gist-blue/10 text-gist-blue hover:bg-gist-blue/20 border border-gist-blue/20 inline-flex items-center"
-                                        title="Voir la fiche affaire"
-                                      >
-                                        <ExternalLink className="inline h-4 w-4 mr-1 align-text-bottom" /> Voir la fiche affaire
-                                      </a>
-                                    </>
-                                  )}
-                                  {copied && <span className="ml-2 text-xs text-green-600">Résumé copié !</span>}
-                                </div>
-                                <div className="border-t border-gist-blue/10 my-2" />
-                                <div className="mt-2">
-                                  <span dangerouslySetInnerHTML={{ __html: message.content.split('<br><br>')[1] || '' }} />
-                                </div>
-                              </div>
-                            );
-                          })()
-                        ) : message.content}
-                        {message.sender === "bot" && explicabilityMap[message.id] && (
-                          <Popover open={openExplicabilityId === message.id} onOpenChange={open => setOpenExplicabilityId(open ? message.id : null)}>
-                            <PopoverTrigger asChild>
-                              <Button variant="ghost" size="icon" className="ml-1 p-1 h-6 w-6 text-sncf-red" aria-label="Voir le contexte IA">
-                                <Info className="h-4 w-4" />
-                              </Button>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-80 text-xs text-gray-700">
-                              <div><b>Fichier courant :</b> {explicabilityMap[message.id].currentFile ? `${explicabilityMap[message.id].currentFile.name} (${explicabilityMap[message.id].currentFile.type})` : 'Aucun'}</div>
-                              {explicabilityMap[message.id].multiFilesActive && explicabilityMap[message.id].multiFilesActive.length > 1 && (
-                                <div><b>Fichiers actifs :</b> {explicabilityMap[message.id].multiFilesActive.map((f: any) => `${f.name} (${f.type})`).join(', ')}</div>
-                              )}
-                              {explicabilityMap[message.id].keyEntities && explicabilityMap[message.id].keyEntities.length > 0 && (
-                                <div><b>Entités clés :</b> {explicabilityMap[message.id].keyEntities.map((e: any) => `${e.type}: ${e.value}`).join(', ')}</div>
-                              )}
-                              {explicabilityMap[message.id].userGoals && explicabilityMap[message.id].userGoals.length > 0 && (
-                                <div><b>Intentions détectées :</b> {explicabilityMap[message.id].userGoals.join(', ')}</div>
-                              )}
-                              {explicabilityMap[message.id].contextSummary && (
-                                <div><b>Résumé du contexte :</b> {explicabilityMap[message.id].contextSummary}</div>
-                              )}
-                            </PopoverContent>
-                          </Popover>
-                        )}
-                      </p>
-                      <p className="text-xs opacity-70 mt-1 text-right">
-                        {message.timestamp.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-                      </p>
-                      {message.sender === "bot" && idx === messages.length - 1 && suggestions.length > 0 && (
-                        <div className="mt-2 flex flex-wrap gap-2">
-                          {suggestions.map((sugg, i) => (
-                            <Button
-                              key={i}
-                              variant="outline"
-                              size="sm"
-                              className="text-xs border-sncf-red text-sncf-red hover:bg-sncf-red hover:text-white"
-                              onClick={() => setInputValue(sugg)}
-                            >
-                              {sugg}
-                            </Button>
-                          ))}
-                        </div>
-                      )}
+                      </div>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="ml-auto"
+                        onClick={() => setShowFileIndexing(false)}
+                      >
+                        Fermer
+                      </Button>
                     </div>
+                  </>
+                )}
+              </div>
+            </div>
+            {/* Fil de discussion (bulle, scrollable, UX améliorée) */}
+            <div className="flex-1 flex flex-col px-4 pb-2">
+              <div
+                className="flex flex-col gap-2 bg-white rounded max-h-[220px] min-h-[80px] overflow-y-auto border border-gray-100 p-2"
+                style={{ scrollbarWidth: "thin" }}
+                tabIndex={0}
+              >
+                {messages.map((msg, idx) => (
+                  <div
+                    key={msg.id}
+                    className={`rounded-2xl px-4 py-2 max-w-[80%] break-words whitespace-pre-line shadow-sm ${msg.sender === "user" ? "bg-sncf-red text-white self-end" : "bg-gray-100 text-gray-800 self-start"}`}
+                  >
+                    <div className="text-sm">{msg.content}</div>
+                    <div className="text-xs opacity-70 mt-1 text-right">{msg.timestamp.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</div>
                   </div>
                 ))}
                 {isTyping && (
-                  <div className="flex justify-start">
-                    <div className="max-w-[80%] rounded-lg p-3 bg-gray-100">
-                      <div className="flex items-center gap-2">
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                        <span className="text-sm">L'assistant réfléchit...</span>
-                      </div>
-                    </div>
+                  <div className="flex items-center gap-2 text-sm text-gray-500">
+                    <Loader2 className="h-4 w-4 animate-spin" /> L'assistant réfléchit...
                   </div>
                 )}
                 <div ref={messagesEndRef} />
               </div>
-            </ScrollArea>
-            <div className="p-4 border-t">
-              <div className="mb-2">
-                <input
-                  type="file"
-                  accept=".pdf,.txt,.docx"
-                  multiple
-                  ref={fileInputRef}
-                  style={{ display: 'none' }}
-                  onChange={handleFileChange}
-                />
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="mb-2 border-sncf-red text-sncf-red hover:bg-sncf-red hover:text-white"
-                  onClick={() => fileInputRef.current?.click()}
-                  disabled={isTyping}
-                >
-                  Ajouter des fichiers (PDF, TXT, DOCX)
-                </Button>
-                {uploadedFiles.length > 0 && (
-                  <div className="flex flex-wrap gap-2 mt-2">
-                    {uploadedFiles.map((uf: UploadedFile, idx: number) => (
-                      <div key={idx} className="flex items-center bg-gray-100 rounded px-2 py-1 text-xs">
-                        <span className="mr-1">{uf.file.name}</span>
-                        {uf.status === 'uploading' && <Loader2 className="h-3 w-3 animate-spin mr-1" />}
-                        {uf.status === 'uploaded' && <span className="text-green-600 mr-1">✓</span>}
-                        {uf.status === 'error' && <span className="text-red-500 mr-1" title={uf.error}>⚠</span>}
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          className="h-4 w-4 p-0 text-red-500"
-                          onClick={() => handleRemoveFile(idx)}
-                          aria-label="Supprimer le fichier"
-                        >
-                          <X className="h-3 w-3" />
-                        </Button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-              {similarPast && similarPast.question && (
-                <div className="mb-2 p-2 bg-yellow-50 border border-yellow-300 rounded text-xs text-yellow-900">
-                  <div className="font-semibold mb-1">Question similaire déjà posée :</div>
-                  <div><b>Question :</b> {similarPast.question}</div>
-                  {similarPast.date && <div><b>Date :</b> {similarPast.date}</div>}
-                  {similarPast.answer && <div className="mt-1"><b>Réponse IA :</b> <span className="block bg-gray-100 border border-gray-200 rounded p-1 mt-1">{similarPast.answer}</span></div>}
-                  <div className="mt-2 flex gap-2">
-                    <Button size="sm" variant="outline" className="text-xs border-sncf-red text-sncf-red hover:bg-sncf-red hover:text-white" onClick={() => setInputValue(similarPast.question)}>
-                      Réutiliser cette question
-                    </Button>
-                  </div>
-                </div>
-              )}
-              <div className="flex gap-2">
-                <Input
-                  placeholder="Tapez votre question..."
-                  value={inputValue}
-                  onChange={(e) => setInputValue(e.target.value)}
-                  onKeyDown={handleKeyDown}
-                  className="text-sm"
-                  disabled={isTyping}
-                />
-                <Button
-                  size="icon"
-                  className="bg-sncf-red hover:bg-red-700"
-                  onClick={handleSendMessage}
-                  disabled={isTyping || !inputValue.trim()}
-                >
-                  <Send className="h-4 w-4" />
-                </Button>
-              </div>
+            </div>
+            {/* Zone de saisie */}
+            <div className="p-4 border-t flex gap-2 bg-white">
+              <Input
+                placeholder="Posez une question sur l'affaire ou ses documents…"
+                value={inputValue}
+                onChange={e => setInputValue(e.target.value)}
+                onKeyDown={handleKeyDown}
+                className="text-sm"
+                disabled={isTyping}
+              />
+              <Button
+                size="icon"
+                className="bg-sncf-red hover:bg-red-700"
+                onClick={handleSendMessage}
+                disabled={isTyping || !inputValue.trim()}
+              >
+                <Send className="h-4 w-4" />
+              </Button>
             </div>
           </CardContent>
         </Card>
       )}
+      {/* Bouton flottant pour ouvrir le ChatBot */}
       <Button
         onClick={() => setIsOpen(!isOpen)}
         className="rounded-full w-14 h-14 bg-sncf-red hover:bg-red-700 shadow-lg"
@@ -443,5 +340,5 @@ export function ChatBot() {
         <MessageSquare className="h-6 w-6" />
       </Button>
     </div>
-  )
+  );
 }

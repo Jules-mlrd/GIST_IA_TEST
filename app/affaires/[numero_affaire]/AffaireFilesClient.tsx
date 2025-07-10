@@ -74,7 +74,7 @@ function FileUploadForm({ numero_affaire, onUploaded }: { numero_affaire: string
   return (
     <form onSubmit={handleUpload} className="flex flex-col gap-2 mt-6 mb-4">
       <input type="file" multiple ref={fileInput} className="border rounded p-2" onChange={handleFileChange} />
-      <button type="submit" className="bg-gist-blue text-white px-4 py-2 rounded" disabled={uploading}>
+      <button type="submit" className="bg-violet-600 hover:bg-violet-700 text-white px-4 py-2 rounded" disabled={uploading}>
         {uploading ? 'Upload en cours...' : 'Uploader'}
       </button>
       {error && <div className="text-red-600 text-sm">{error}</div>}

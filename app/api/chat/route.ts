@@ -228,9 +228,28 @@ async function semanticSearchInFiles(question: string, pdfKeys: string[], txtKey
   return scored.sort((a, b) => b.score - a.score).slice(0, 2);
 }
 
+// Nouvelle fonction : recherche sémantique sur les fichiers indexés
+async function semanticSearchInIndexedFiles(question: string, affaireId: string): Promise<{ file: string, passage: string, score: number }[]> {
+  // Récupère toutes les clés indexées pour l'affaire
+  const keys = await redis.keys(`affaire:${affaireId}:file:*`);
+  if (!keys || keys.length === 0) return [];
+  const qEmbed = await getEmbeddingOpenAI(question);
+  const scored: { file: string, passage: string, score: number }[] = [];
+  for (const key of keys) {
+    const val = await redis.get(key);
+    if (!val) continue;
+    try {
+      const { text, embedding } = JSON.parse(val);
+      const score = cosineSimilarity(qEmbed, embedding);
+      scored.push({ file: key.split(':file:')[1], passage: text.slice(0, 2000), score });
+    } catch {}
+  }
+  return scored.sort((a, b) => b.score - a.score).slice(0, 2);
+}
+
 export async function POST(req: Request) {
   try {
-    const { message, userId = "default" } = await req.json();
+    const { message, userId = "default", affaireId } = await req.json();
     if (isMemoryResetCommand(message)) {
       clearMemory(userId);
       return NextResponse.json({ reply: "La mémoire de la session a été réinitialisée." });
@@ -376,7 +395,12 @@ export async function POST(req: Request) {
       await updateMemory(userId, { multiFilesActive: multiFiles });
       memory.multiFilesActive = multiFiles;
     }
-    const semanticResults = await semanticSearchInFiles(message, pdfKeys, txtKeys, bucketName);
+    let semanticResults: { file: string, passage: string, score: number }[] = [];
+    if (affaireId) {
+      semanticResults = await semanticSearchInIndexedFiles(message, affaireId);
+    } else {
+      semanticResults = await semanticSearchInFiles(message, pdfKeys, txtKeys, bucketName);
+    }
     let semanticContext = '';
     if (semanticResults.length > 0) {
       semanticContext = semanticResults.map(r => `Extrait pertinent du fichier ${r.file} :\n${r.passage}`).join('\n\n');

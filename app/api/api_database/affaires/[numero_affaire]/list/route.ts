@@ -4,9 +4,9 @@ import s3 from '@/lib/s3Client';
 
 const BUCKET_NAME = 'gism-documents';
 
-export async function GET(req: NextRequest, { params }: { params: { numero_affaire: string } }) {
+export async function GET(req: NextRequest, context: { params: { numero_affaire: string } }) {
   try {
-    const { numero_affaire } = params;
+    const numero_affaire = context.params.numero_affaire;
     if (!numero_affaire) {
       return NextResponse.json({ success: false, error: 'numero_affaire manquant dans l’URL.' }, { status: 400 });
     }

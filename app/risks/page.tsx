@@ -1,6 +1,5 @@
 "use client"
 
-import { Layout } from "@/components/layout"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -177,7 +176,7 @@ export default function RisksPage() {
   const displayedRisks = risks.filter(risk => !blacklist.includes(risk.description))
 
   return (
-    <Layout title="Risques" subtitle="Gestion des risques du projet">
+    <>
       <div className="flex justify-between items-center mb-4">
         <div className="flex items-center gap-2">
           <Badge variant="destructive" className="rounded-sm">
@@ -283,6 +282,6 @@ export default function RisksPage() {
           </CardContent>
         </Card>
       )}
-    </Layout>
+    </>
   )
 }
