@@ -274,6 +274,9 @@ export default function ProjectSelectionPage() {
       .finally(() => setAnneeLoading(false));
   }, []);
 
+  const [syncing, setSyncing] = useState(false);
+  const [syncResult, setSyncResult] = useState<string | null>(null);
+
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
       {/* Bandeau horizontal */}
@@ -293,6 +296,35 @@ export default function ProjectSelectionPage() {
           </div>
         </div>
       </header>
+      {/* Bouton synchronisation S3 */}
+      <div className="w-full bg-white border-b border-gray-200">
+        <div className="max-w-6xl mx-auto flex items-center justify-end gap-4 px-4 md:px-8 h-12">
+          <button
+            className="bg-gist-blue text-white px-4 py-2 rounded shadow hover:bg-blue-700 text-sm font-semibold"
+            onClick={async () => {
+              setSyncing(true);
+              setSyncResult(null);
+              try {
+                const res = await fetch('/api/api_database/affaires/sync-s3');
+                const data = await res.json();
+                if (data.success) {
+                  setSyncResult(`Synchronisation terminée : ${data.report.length} affaire(s) synchronisée(s).`);
+                } else {
+                  setSyncResult(`Erreur : ${data.error || 'Synchronisation échouée.'}`);
+                }
+              } catch (e: any) {
+                setSyncResult(`Erreur : ${e.message || 'Synchronisation échouée.'}`);
+              } finally {
+                setSyncing(false);
+              }
+            }}
+            disabled={syncing}
+          >
+            {syncing ? 'Synchronisation...' : 'Synchroniser S3'}
+          </button>
+          {syncResult && <span className="ml-4 text-sm text-gist-blue">{syncResult}</span>}
+        </div>
+      </div>
 
       {/* Bandeau navigation secondaire */}
       <nav className="w-full bg-white border-b border-gray-200">
@@ -782,7 +814,18 @@ export default function ProjectSelectionPage() {
                   <tbody>
                     {results.slice((page-1)*pageSize, page*pageSize).map((row, idx) => (
                       <tr key={row.numero_affaire || idx} className="hover:bg-gray-50">
-                        <td className="px-2 py-1 border">{row.numero_affaire}</td>
+                        <td className="px-2 py-1 border">
+                          {row.numero_affaire ? (
+                            <a
+                              href={`/affaires/${row.numero_affaire}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-blue-600 underline hover:text-blue-800"
+                            >
+                              {row.numero_affaire}
+                            </a>
+                          ) : null}
+                        </td>
                         <td className="px-2 py-1 border">{row.titre}</td>
                         <td className="px-2 py-1 border">{row.etat}</td>
                         <td className="px-2 py-1 border">{row.referent}</td>

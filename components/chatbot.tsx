@@ -3,7 +3,7 @@
 import type React from "react"
 
 import { useState, useRef, useEffect } from "react"
-import { MessageSquare, Send, X, Loader2, Info } from "lucide-react"
+import { MessageSquare, Send, X, Loader2, Info, Copy, ExternalLink } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -39,12 +39,7 @@ function getOrCreateUserId() {
 export function ChatBot() {
   const [isOpen, setIsOpen] = useState(false)
   const [messages, setMessages] = useState<Message[]>([
-    {
-      id: "welcome",
-      content: "Bonjour ! Je suis l'assistant GIST. Comment puis-je vous aider avec votre projet ?",
-      sender: "bot",
-      timestamp: new Date(),
-    },
+    // Pas de message d'accueil
   ])
   const [inputValue, setInputValue] = useState("")
   const [isTyping, setIsTyping] = useState(false)
@@ -56,6 +51,8 @@ export function ChatBot() {
   const [similarPast, setSimilarPast] = useState<any>(null)
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([])
   const fileInputRef = useRef<HTMLInputElement>(null)
+  // Ajoute un état pour la notification de copie
+  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
@@ -113,6 +110,47 @@ export function ChatBot() {
     const currentMessage = inputValue
     setInputValue("")
     setIsTyping(true)
+
+    // Ajout : détection demande de résumé d'affaire
+    const resumeRegex = /résum[ée] (?:de |l'|du |d’)?affaire ([A-Za-z0-9\-_]+)/i;
+    const match = currentMessage.match(resumeRegex);
+    if (match) {
+      const numeroAffaire = match[1];
+      try {
+        const response = await fetch(`/api/api_database/affaires/summary?numero_affaire=${encodeURIComponent(numeroAffaire)}`);
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(errorText || 'Erreur API résumé affaire');
+        }
+        const data = await response.json();
+        const botMessage: Message = {
+          id: `bot-${Date.now()}`,
+          content: data.summary
+            ? `<b>Résumé de l'affaire <a href="/project-selection?numero_affaire=${encodeURIComponent(numeroAffaire)}" class="underline text-gist-blue" target="_blank">${numeroAffaire}</a></b><br><br>${data.summary}`
+            : 'Aucun résumé généré.',
+          sender: "bot",
+          timestamp: new Date(),
+        }
+        setMessages((prev) => [...prev, botMessage])
+        setSuggestions([])
+        setExplicabilityMap((prev) => ({ ...prev, [botMessage.id]: null }))
+        setSimilarPast(null)
+      } catch (error: any) {
+        const errorMessage: Message = {
+          id: `bot-${Date.now()}`,
+          content: `Erreur lors de la génération du résumé : ${error?.message || 'Erreur inconnue'}`,
+          sender: "bot",
+          timestamp: new Date(),
+        }
+        setMessages((prev) => [...prev, errorMessage])
+        setSuggestions([])
+        setExplicabilityMap((prev) => ({ ...prev, [userMessage.id]: null }))
+        setSimilarPast(null)
+      } finally {
+        setIsTyping(false)
+      }
+      return;
+    }
 
     try {
       console.log('Envoi du message:', currentMessage)
@@ -185,12 +223,8 @@ export function ChatBot() {
             <div>
               <CardTitle className="text-sm flex items-center gap-2">
                 <MessageSquare className="h-4 w-4" />
-                Assistant SNCF
-                <Badge variant="secondary" className="bg-white/20 text-white text-xs">
-                  IA
-                </Badge>
+                {/* Pas de description d'aide */}
               </CardTitle>
-              <CardDescription className="text-red-100 text-xs">Posez vos questions sur votre projet</CardDescription>
             </div>
             <Button
               variant="ghost"
@@ -223,7 +257,50 @@ export function ChatBot() {
                         </div>
                       )}
                       <p className="text-sm whitespace-pre-wrap flex items-center gap-2">
-                        {message.content}
+                        {message.sender === "bot" && message.content.includes('<a ') ? (
+                          (() => {
+                            const match = message.content.match(/affaire <a [^>]*>([^<]+)<\/a>/);
+                            const numero = match ? match[1] : null;
+                            const url = numero ? `/project-selection?numero_affaire=${encodeURIComponent(numero)}` : null;
+                            return (
+                              <div className="border border-gist-blue/30 rounded-lg bg-gist-blue/5 p-3 mb-1">
+                                <div className="flex items-center gap-2 mb-2">
+                                  <span dangerouslySetInnerHTML={{ __html: message.content.split('<br><br>')[0] }} />
+                                  {url && (
+                                    <>
+                                      <button
+                                        className="ml-2 px-2 py-1 text-xs rounded bg-gist-blue/10 text-gist-blue hover:bg-gist-blue/20 border border-gist-blue/20"
+                                        onClick={() => {
+                                          const summary = message.content.split('<br><br>')[1] || '';
+                                          navigator.clipboard.writeText(summary);
+                                          setCopied(true);
+                                          setTimeout(() => setCopied(false), 1200);
+                                        }}
+                                        title="Copier le résumé"
+                                      >
+                                        <Copy className="inline h-4 w-4 mr-1 align-text-bottom" /> Copier le résumé
+                                      </button>
+                                      <a
+                                        href={url}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="ml-2 px-2 py-1 text-xs rounded bg-gist-blue/10 text-gist-blue hover:bg-gist-blue/20 border border-gist-blue/20 inline-flex items-center"
+                                        title="Voir la fiche affaire"
+                                      >
+                                        <ExternalLink className="inline h-4 w-4 mr-1 align-text-bottom" /> Voir la fiche affaire
+                                      </a>
+                                    </>
+                                  )}
+                                  {copied && <span className="ml-2 text-xs text-green-600">Résumé copié !</span>}
+                                </div>
+                                <div className="border-t border-gist-blue/10 my-2" />
+                                <div className="mt-2">
+                                  <span dangerouslySetInnerHTML={{ __html: message.content.split('<br><br>')[1] || '' }} />
+                                </div>
+                              </div>
+                            );
+                          })()
+                        ) : message.content}
                         {message.sender === "bot" && explicabilityMap[message.id] && (
                           <Popover open={openExplicabilityId === message.id} onOpenChange={open => setOpenExplicabilityId(open ? message.id : null)}>
                             <PopoverTrigger asChild>
@@ -355,9 +432,6 @@ export function ChatBot() {
                   <Send className="h-4 w-4" />
                 </Button>
               </div>
-              <p className="text-xs text-gray-500 mt-2">
-                Assistant IA connecté pour répondre à vos questions sur le projet.
-              </p>
             </div>
           </CardContent>
         </Card>
