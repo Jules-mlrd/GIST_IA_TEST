@@ -141,12 +141,9 @@ export default function AffaireDetailClient({ affaire }: { affaire: any }) {
                 <AffaireFilesClient numero_affaire={affaire.numero_affaire} />
               </div>
             )}
-            <ChatBot
-              affaireId={affaire.numero_affaire}
-              files={files}
-              loading={loading}
-            />
           </div>
+          {/* ChatBot flottant classique */}
+          <ChatBot affaireId={affaire.numero_affaire} files={files} loading={loading} />
         </div>
       </div>
       {/* Bloc Demande client */}

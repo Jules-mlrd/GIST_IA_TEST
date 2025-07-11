@@ -1,5 +1,6 @@
 "use client";
 import React from 'react';
+import { ChatBot } from "@/components/chatbot";
 
 function FileList({ files }: { files: any[] }) {
   if (!files || files.length === 0) return <div className="text-gray-500">Aucun fichier dans ce dossier.</div>;
@@ -110,6 +111,13 @@ export default function AffaireFilesClient({ numero_affaire }: { numero_affaire:
       <h2 className="text-lg font-semibold mb-4">Fichiers de l'affaire</h2>
       <FileUploadForm numero_affaire={numero_affaire} onUploaded={fetchFiles} />
       {loading ? <div>Chargement...</div> : <FileList files={files} />}
+      {/* Bloc ChatBot IA */}
+      <div className="mt-8">
+        <h3 className="text-base font-semibold mb-2 text-sncf-red flex items-center gap-2">
+          <span>Assistant IA GIST</span>
+        </h3>
+        <ChatBot affaireId={numero_affaire} files={files} loading={loading} />
+      </div>
     </div>
   );
 } 

@@ -249,7 +249,7 @@ async function semanticSearchInIndexedFiles(question: string, affaireId: string)
 
 export async function POST(req: Request) {
   try {
-    const { message, userId = "default", affaireId } = await req.json();
+    const { message, userId = "default", affaireId, readFiles = true, contextFiles } = await req.json();
     if (isMemoryResetCommand(message)) {
       clearMemory(userId);
       return NextResponse.json({ reply: "La mémoire de la session a été réinitialisée." });
@@ -396,17 +396,35 @@ export async function POST(req: Request) {
       memory.multiFilesActive = multiFiles;
     }
     let semanticResults: { file: string, passage: string, score: number }[] = [];
-    if (affaireId) {
-      semanticResults = await semanticSearchInIndexedFiles(message, affaireId);
-    } else {
-      semanticResults = await semanticSearchInFiles(message, pdfKeys, txtKeys, bucketName);
-    }
     let semanticContext = '';
-    if (semanticResults.length > 0) {
-      semanticContext = semanticResults.map(r => `Extrait pertinent du fichier ${r.file} :\n${r.passage}`).join('\n\n');
+    let contextFilesText = '';
+    if (Array.isArray(contextFiles) && contextFiles.length > 0) {
+      // Charger uniquement les fichiers explicitement sélectionnés
+      for (const fileKey of contextFiles) {
+        let text = '';
+        if (/\.pdf$/i.test(fileKey)) {
+          text = await fetchPdfTextFromS3(bucketName, fileKey);
+        } else if (/\.txt$/i.test(fileKey)) {
+          text = await fetchTxtContentFromS3(bucketName, fileKey);
+        }
+        if (text) {
+          contextFilesText += `\n\n---\nContenu du fichier ${fileKey}:\n${text}`;
+        }
+      }
+    } else if (readFiles) {
+      // Comportement normal : recherche sémantique
+      if (affaireId) {
+        semanticResults = await semanticSearchInIndexedFiles(message, affaireId);
+      } else {
+        semanticResults = await semanticSearchInFiles(message, pdfKeys, txtKeys, bucketName);
+      }
+      if (semanticResults.length > 0) {
+        semanticContext = semanticResults.map(r => `Extrait pertinent du fichier ${r.file} :\n${r.passage}`).join('\n\n');
+      }
     }
     const openaiMessages = [
       { role: "system", content: SYSTEM_PROMPT },
+      contextFilesText ? { role: "system", content: `Contexte extrait des fichiers sélectionnés :\n${contextFilesText}` } : undefined,
       semanticContext ? { role: "system", content: `Contexte extrait par recherche sémantique :\n${semanticContext}` } : undefined,
       memory.contextSummary ? { role: "system", content: `Résumé du contexte : ${memory.contextSummary}` } : undefined,
       memory.userGoals && memory.userGoals.length ? { role: "system", content: `Objectifs utilisateur détectés : ${memory.userGoals.join(", ")}` } : undefined,
