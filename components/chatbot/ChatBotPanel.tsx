@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useState } from "react";
-import { X, Loader2, MoreHorizontal, FileText, Paperclip, ArrowUp, FolderOpen } from "lucide-react";
+import { X, Loader2, MoreHorizontal, FileText, Paperclip, ArrowUp, FolderOpen, Settings } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
 type Message = {
@@ -52,7 +52,18 @@ function sanitizeSummaryHtml(html: string): string {
   return clean;
 }
 
-const ChatBotPanel: React.FC<Props & { readFiles: boolean; onToggleReadFiles: () => void; onFileContextClick?: () => void; }> = ({
+const ChatBotPanel: React.FC<Props & {
+  readFiles: boolean;
+  onToggleReadFiles: () => void;
+  onFileButtonClick?: () => void;
+  contextFiles: string[];
+  onRemoveContextFile?: (key: string) => void;
+  suggestions?: string[];
+  explicability?: { files?: string[]; prompt?: string };
+  onShowPromptModal?: () => void;
+  userPrefs?: { readFiles: boolean; showPromptByDefault: boolean };
+  onPrefChange?: (key: string, value: boolean) => void;
+}> = ({
   isOpen,
   onClose,
   affaireId,
@@ -71,9 +82,15 @@ const ChatBotPanel: React.FC<Props & { readFiles: boolean; onToggleReadFiles: ()
   readFiles,
   onToggleReadFiles,
   onFileContextClick,
+  suggestions,
+  explicability,
+  onShowPromptModal,
+  userPrefs,
+  onPrefChange,
 }) => {
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [showPrefs, setShowPrefs] = useState(false);
   const menuRef = useRef<HTMLDivElement | null>(null);
 
   // Ferme le menu si clic en dehors
@@ -140,12 +157,36 @@ const ChatBotPanel: React.FC<Props & { readFiles: boolean; onToggleReadFiles: ()
                   </button>
                   {menuOpen && (
                     <div
-                      className="absolute right-0 mt-2 w-48 bg-gray-50 border border-gray-300 rounded-xl shadow-xl z-50 animate-fade-in text-gray-800"
+                      className="absolute right-0 mt-2 w-56 bg-gray-50 border border-gray-300 rounded-xl shadow-xl z-50 animate-fade-in text-gray-800"
                       onClick={e => e.stopPropagation()}
                     >
-                      <button className="w-full text-left px-4 py-2 hover:bg-gray-200 rounded-t-xl" onClick={() => { setMenuOpen(false); /* TODO: effacer historique */ }}>Effacer l’historique</button>
+                      <button className="w-full text-left px-4 py-2 hover:bg-gray-200 rounded-t-xl flex items-center gap-2" onClick={() => setShowPrefs(true)}>
+                        <Settings className="h-4 w-4" /> Préférences
+                      </button>
                       <button className="w-full text-left px-4 py-2 hover:bg-gray-200" onClick={() => { setMenuOpen(false); /* TODO: exporter */ }}>Exporter la conversation</button>
                       <button className="w-full text-left px-4 py-2 hover:bg-gray-200 rounded-b-xl" onClick={() => { setMenuOpen(false); /* TODO: copier */ }}>Copier la conversation</button>
+                    </div>
+                  )}
+                  {/* Modale Préférences */}
+                  {showPrefs && (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
+                      <div className="bg-white rounded-2xl shadow-xl p-6 w-full max-w-xs relative">
+                        <button className="absolute top-2 right-2 p-2" onClick={() => setShowPrefs(false)}><X className="h-5 w-5" /></button>
+                        <h3 className="font-bold text-lg mb-4">Préférences</h3>
+                        <div className="flex flex-col gap-4">
+                          <label className="flex items-center gap-2">
+                            <input type="checkbox" checked={userPrefs?.readFiles} onChange={e => onPrefChange && onPrefChange('readFiles', e.target.checked)} />
+                            <span>Activer la lecture des fichiers S3</span>
+                          </label>
+                          <label className="flex items-center gap-2">
+                            <input type="checkbox" checked={userPrefs?.showPromptByDefault} onChange={e => onPrefChange && onPrefChange('showPromptByDefault', e.target.checked)} />
+                            <span>Afficher le prompt IA par défaut</span>
+                          </label>
+                        </div>
+                        <div className="flex justify-end mt-6">
+                          <button className="px-4 py-2 rounded bg-sncf-red text-white font-bold hover:bg-red-700" onClick={() => setShowPrefs(false)}>Fermer</button>
+                        </div>
+                      </div>
                     </div>
                   )}
                 </div>
@@ -204,6 +245,31 @@ const ChatBotPanel: React.FC<Props & { readFiles: boolean; onToggleReadFiles: ()
                         style={{ wordBreak: 'break-word', overflowWrap: 'anywhere', cursor: 'pointer' }}
                       >
                         {msg.content}
+                      </div>
+                    )}
+                    {/* Suggestions et explicabilité sous la dernière réponse IA */}
+                    {idx === messages.length - 1 && msg.sender === "bot" && (
+                      <div className="w-full mt-2 flex flex-col gap-2">
+                        {suggestions && suggestions.length > 0 && (
+                          <div className="flex flex-wrap gap-2">
+                            {suggestions.map((s, i) => (
+                              <button key={i} className="px-3 py-1 rounded-full bg-blue-50 text-blue-700 text-xs hover:bg-blue-100 border border-blue-200 transition-colors">
+                                {s}
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                        {explicability?.files && explicability.files.length > 0 && (
+                          <div className="text-xs text-gray-400 mt-1 flex items-center gap-2">
+                            <span>Fichiers utilisés :</span>
+                            {explicability.files.map((f, i) => (
+                              <span key={i} className="bg-gray-100 border border-gray-200 rounded px-2 py-0.5 text-gray-700 ml-1">{f}</span>
+                            ))}
+                            {explicability.prompt && onShowPromptModal && (
+                              <button className="ml-2 underline text-blue-500 text-xs" onClick={onShowPromptModal} title="Voir le prompt IA">Prompt IA</button>
+                            )}
+                          </div>
+                        )}
                       </div>
                     )}
                   </motion.div>

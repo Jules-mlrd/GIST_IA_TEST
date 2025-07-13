@@ -12,15 +12,23 @@ function writeExtractedRisks(risks: any[]) {
   fs.writeFileSync(EXTRACTED_RISKS_FILE, JSON.stringify(risks, null, 2), 'utf-8');
 }
 
-export async function POST() {
+export async function POST(req: Request) {
   try {
+    let affaire = null;
+    try {
+      const body = await req.json();
+      affaire = body.affaire;
+    } catch {}
     const [pdfFiles, txtFiles] = await Promise.all([
       listPdfFilesInS3(BUCKET_NAME),
       listTxtFilesInS3(BUCKET_NAME),
     ]);
+    // Filtrer par affaire si précisé
+    const filteredPdfFiles = affaire ? pdfFiles.filter(key => key.includes(affaire)) : pdfFiles;
+    const filteredTxtFiles = affaire ? txtFiles.filter(key => key.includes(affaire)) : txtFiles;
     const allFiles = [
-      ...pdfFiles.map((key) => ({ key, type: 'pdf' })),
-      ...txtFiles.map((key) => ({ key, type: 'txt' })),
+      ...filteredPdfFiles.map((key) => ({ key, type: 'pdf' })),
+      ...filteredTxtFiles.map((key) => ({ key, type: 'txt' })),
     ];
     const texts = await Promise.all(
       allFiles.map(async ({ key, type }) => {

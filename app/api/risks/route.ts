@@ -56,21 +56,12 @@ export async function POST(req: Request) {
 
 export async function DELETE(req: Request) {
   try {
-    const { id, description } = await req.json();
-    let risks = readManualRisks();
-    const before = risks.length;
-    if (id) {
-      risks = risks.filter((r: any) => r.id !== id);
-    } else if (description) {
-      risks = risks.filter((r: any) => r.description !== description);
-    }
-    if (risks.length === before) {
-      return NextResponse.json({ error: 'Risque non trouvé.' }, { status: 404 });
-    }
-    writeManualRisks(risks);
+    // Suppression du cache IA et manuel
+    if (fs.existsSync(EXTRACTED_RISKS_FILE)) fs.unlinkSync(EXTRACTED_RISKS_FILE);
+    if (fs.existsSync(MANUAL_RISKS_FILE)) fs.unlinkSync(MANUAL_RISKS_FILE);
     return NextResponse.json({ success: true });
   } catch (error) {
-    return NextResponse.json({ error: 'Erreur lors de la suppression du risque.' }, { status: 500 });
+    return NextResponse.json({ error: 'Erreur lors de la suppression du cache.' }, { status: 500 });
   }
 }
 
@@ -121,12 +112,24 @@ export async function POST_refresh(_: Request) {
   }
 }
 
-export async function GET() {
+export async function GET(req: Request) {
   try {
     let risks = readExtractedRisks();
     const manualRisks = readManualRisks();
     const allRisks = [...manualRisks, ...risks];
-    return NextResponse.json({ risks: allRisks });
+    // Filtrage par affaire si paramètre présent
+    let filteredRisks = allRisks;
+    if (req && typeof req.url === 'string') {
+      const url = new URL(req.url, 'http://localhost');
+      const affaire = url.searchParams.get('affaire');
+      if (affaire) {
+        filteredRisks = allRisks.filter(r =>
+          (r.affaire && r.affaire === affaire) ||
+          (r.key && r.key.includes(affaire))
+        );
+      }
+    }
+    return NextResponse.json({ risks: filteredRisks });
   } catch (error) {
     return NextResponse.json({ error: 'Erreur lors de l\'extraction des risques.' }, { status: 500 });
   }

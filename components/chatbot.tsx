@@ -2,7 +2,7 @@
 import { useState, useRef, useEffect } from "react";
 import ChatToggleButton from "./chatbot/ChatToggleButton";
 import ChatBotPanel from "./chatbot/ChatBotPanel";
-import { MessageSquare, Send, X, Loader2, FileText, CheckCircle, XCircle, Info } from "lucide-react";
+import { MessageSquare, Send, X, Loader2, FileText, CheckCircle, XCircle, Info, Paperclip } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -41,6 +41,12 @@ type Props = {
   loading: boolean;
 };
 
+// Préférences utilisateur par défaut
+const DEFAULT_USER_PREFS = {
+  readFiles: true,
+  showPromptByDefault: false,
+};
+
 export function ChatBot({ affaireId, files, loading, affaireName }: Props & { affaireName?: string }) {
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -52,8 +58,39 @@ export function ChatBot({ affaireId, files, loading, affaireName }: Props & { af
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const { toast } = useToast();
   const cardRef = useRef<HTMLDivElement | null>(null);
-  const [readFiles, setReadFiles] = useState(true);
+  const [userPrefs, setUserPrefs] = useState(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        return { ...DEFAULT_USER_PREFS, ...JSON.parse(localStorage.getItem('chatbotUserPrefs') || '{}') };
+      } catch {
+        return DEFAULT_USER_PREFS;
+      }
+    }
+    return DEFAULT_USER_PREFS;
+  });
+  const [readFiles, setReadFiles] = useState(userPrefs.readFiles);
   const [contextFiles, setContextFiles] = useState<string[]>([]);
+  const [pendingContextFiles, setPendingContextFiles] = useState<string[]>([]);
+  const [showFileModal, setShowFileModal] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [suggestions, setSuggestions] = useState<string[]>([]);
+  const [explicability, setExplicability] = useState<{ files?: string[]; prompt?: string } | null>(null);
+  const [showPromptModal, setShowPromptModal] = useState(false);
+
+  // Synchronise readFiles avec userPrefs
+  useEffect(() => {
+    setReadFiles(userPrefs.readFiles);
+  }, [userPrefs.readFiles]);
+  // Sauvegarde userPrefs dans localStorage à chaque modif
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('chatbotUserPrefs', JSON.stringify(userPrefs));
+    }
+  }, [userPrefs]);
+  // Handler pour changer une préférence
+  const handlePrefChange = (key: string, value: boolean) => {
+    setUserPrefs(prefs => ({ ...prefs, [key]: value }));
+  };
 
   // Gestion du clic en dehors pour refermer le ChatBot
   useEffect(() => {
@@ -108,6 +145,45 @@ export function ChatBot({ affaireId, files, loading, affaireName }: Props & { af
     // À terme, ouvrir un sélecteur de fichiers
   };
 
+  // Handler pour le bouton "Joindre des fichiers"
+  const handleFileButtonClick = () => {
+    setPendingContextFiles(contextFiles);
+    setShowFileModal(true);
+  };
+  // Handler pour la sélection S3
+  const handleS3FileToggle = (key: string) => {
+    setPendingContextFiles(cf => cf.includes(key) ? cf.filter(k => k !== key) : [...cf, key]);
+  };
+  // Handler pour l'upload local
+  const handleLocalFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const filesToUpload = e.target.files;
+    if (!filesToUpload) return;
+    setUploading(true);
+    let newKeys: string[] = [];
+    for (const file of Array.from(filesToUpload)) {
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('affaireId', affaireId);
+      const res = await fetch(`/api/files/${affaireId}/upload`, { method: 'POST', body: formData });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.key) newKeys.push(data.key);
+      }
+    }
+    setPendingContextFiles(cf => [...cf, ...newKeys]);
+    setUploading(false);
+  };
+  // Handler pour retirer un fichier sélectionné
+  const handleRemoveContextFile = (key: string) => setContextFiles(cf => cf.filter(k => k !== key));
+  const handleRemovePendingContextFile = (key: string) => setPendingContextFiles(cf => cf.filter(k => k !== key));
+  // Handler pour fermer la modale
+  const handleCloseFileModal = () => setShowFileModal(false);
+  // Handler pour valider la sélection
+  const handleValidateFileModal = () => {
+    setContextFiles(pendingContextFiles);
+    setShowFileModal(false);
+  };
+
   const handleSendMessage = async () => {
     if (!inputValue.trim()) return;
     const userMessage: MessageUser = {
@@ -140,6 +216,8 @@ export function ChatBot({ affaireId, files, loading, affaireName }: Props & { af
         sender: "bot",
         timestamp: new Date(),
       } as MessageBot]);
+      setSuggestions(Array.isArray(data.suggestions) ? data.suggestions : []);
+      setExplicability(data.explicability || null);
     } catch (error) {
       setMessages(prev => [...prev, {
         id: `bot-${Date.now()}`,
@@ -147,6 +225,8 @@ export function ChatBot({ affaireId, files, loading, affaireName }: Props & { af
         sender: "bot",
         timestamp: new Date(),
       } as MessageBot]);
+      setSuggestions([]);
+      setExplicability(null);
     } finally {
       setIsTyping(false);
     }
@@ -160,9 +240,6 @@ export function ChatBot({ affaireId, files, loading, affaireName }: Props & { af
       handleSendMessage();
     }
   };
-
-  // Handler pour le bouton fichiers (exemple : ouvrir la sélection de fichiers)
-  const handleFileButtonClick = () => setShowFileIndexing(true);
 
   // Générer le résumé à afficher (exemple : dernier message bot de type résumé, ou null)
   const summary = messages.find(m => m.sender === "bot" && typeof m.content !== 'string')?.content || null;
@@ -205,13 +282,82 @@ export function ChatBot({ affaireId, files, loading, affaireName }: Props & { af
         onSendMessage={handleSendMessage}
         onInputKeyDown={handleInputKeyDown}
         onFileButtonClick={handleFileButtonClick}
-        fileButtonLabel="Joindre des fichiers"
-        readFiles={readFiles}
-        onToggleReadFiles={() => setReadFiles(v => !v)}
-        onFileContextClick={handleFileContextClick}
         contextFiles={contextFiles}
+        onRemoveContextFile={handleRemoveContextFile}
+        readFiles={readFiles}
+        onToggleReadFiles={() => {
+          setReadFiles(v => {
+            handlePrefChange('readFiles', !v);
+            return !v;
+          });
+        }}
+        suggestions={suggestions}
+        explicability={explicability}
+        onShowPromptModal={() => setShowPromptModal(true)}
+        userPrefs={userPrefs}
+        onPrefChange={handlePrefChange}
       />
       <ChatToggleButton isOpen={isOpen} onClick={() => setIsOpen(!isOpen)} />
+      {/* Modale de sélection/ajout de fichiers */}
+      {showFileModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
+          <div className="bg-white rounded-2xl shadow-xl p-6 w-full max-w-md relative">
+            <button className="absolute top-2 right-2 p-2" onClick={handleCloseFileModal}><X className="h-5 w-5" /></button>
+            <h3 className="font-bold text-lg mb-4">Joindre des fichiers</h3>
+            <div className="mb-4">
+              <div className="font-semibold mb-2">Depuis le bucket S3 :</div>
+              <div className="max-h-40 overflow-y-auto space-y-1">
+                {files.map(f => (
+                  <label key={f.key} className="flex items-center gap-2 cursor-pointer text-sm">
+                    <input type="checkbox" checked={pendingContextFiles.includes(f.key)} onChange={() => handleS3FileToggle(f.key)} />
+                    <span>{f.name}</span>
+                    {pendingContextFiles.includes(f.key) && (
+                      <button className="ml-1" onClick={() => handleRemovePendingContextFile(f.key)}><X className="h-3 w-3" /></button>
+                    )}
+                  </label>
+                ))}
+                {files.length === 0 && <div className="text-gray-400 text-xs">Aucun fichier disponible</div>}
+              </div>
+            </div>
+            <div className="mb-4">
+              <div className="font-semibold mb-2">Depuis mon ordinateur :</div>
+              <input type="file" multiple onChange={handleLocalFileUpload} disabled={uploading} />
+            </div>
+            <div className="flex justify-end gap-2 mt-4">
+              <button className="px-4 py-2 rounded bg-gray-100 hover:bg-gray-200" onClick={handleCloseFileModal}>Fermer</button>
+              <button
+                className="px-4 py-2 rounded bg-sncf-red text-white font-bold hover:bg-red-700 disabled:opacity-60"
+                onClick={handleValidateFileModal}
+                disabled={pendingContextFiles.length === 0}
+              >Valider</button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Affichage des fichiers sélectionnés sous la barre de saisie (pills) */}
+      {contextFiles.length > 0 && (
+        <div className="fixed right-6 bottom-28 z-50 flex flex-wrap gap-2 max-w-md">
+          {contextFiles.map(key => {
+            const file = files.find(f => f.key === key);
+            return (
+              <span key={key} className="flex items-center bg-blue-50 border border-blue-200 text-blue-800 rounded-full px-3 py-1 text-xs">
+                {file ? file.name : key}
+                <button className="ml-1" onClick={() => handleRemoveContextFile(key)}><X className="h-3 w-3" /></button>
+              </span>
+            );
+          })}
+        </div>
+      )}
+      {/* Modale pour afficher le prompt complet (explicabilité) */}
+      {showPromptModal && explicability?.prompt && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
+          <div className="bg-white rounded-2xl shadow-xl p-6 w-full max-w-2xl relative">
+            <button className="absolute top-2 right-2 p-2" onClick={() => setShowPromptModal(false)}><X className="h-5 w-5" /></button>
+            <h3 className="font-bold text-lg mb-4">Prompt complet envoyé à l'IA</h3>
+            <pre className="text-xs bg-gray-50 p-4 rounded max-h-[60vh] overflow-y-auto whitespace-pre-wrap">{explicability.prompt}</pre>
+          </div>
+        </div>
+      )}
     </>
   );
 }

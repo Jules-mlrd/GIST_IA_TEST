@@ -2,7 +2,6 @@
 
 import React from "react"
 import { useState, useEffect, useRef } from "react"
-import { Layout } from "@/components/layout"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -11,6 +10,7 @@ import { Chart as ChartJS, BarElement, CategoryScale, LinearScale, Tooltip, Lege
 import { Bar, Line, Pie } from "react-chartjs-2"
 import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from "@/components/ui/select"
 import { X, Plus } from "lucide-react"
+import { useSearchParams } from "next/navigation";
 
 ChartJS.register(BarElement, CategoryScale, LinearScale, Tooltip, Legend, PointElement, LineElement, ArcElement)
 
@@ -968,6 +968,8 @@ function UploadModal({
 }
 
 export default function AiDashboardPage() {
+  const searchParams = useSearchParams();
+  const affaireParam = searchParams?.get('affaire');
   const [documents, setDocuments] = useState<S3Document[]>([])
   const {
     widgets,
@@ -1046,6 +1048,11 @@ export default function AiDashboardPage() {
     if (type === "txt") return documents.filter(doc => doc.type.toLowerCase() === "txt")
     return []
   }
+
+  // Filtrer les documents par affaire si affaireParam est défini
+  const filteredDocuments = affaireParam
+    ? documents.filter(doc => doc.key.includes(affaireParam))
+    : documents;
 
   // Téléchargement du résumé global
   const handleDownloadSummary = (id: number) => {
@@ -1162,11 +1169,14 @@ export default function AiDashboardPage() {
   }
 
   return (
-    <Layout title="Dashboard IA" subtitle="Analyse intelligente de vos documents projet">
+    <>
+      {/* TopNavBar est déjà inclus par le layout global */}
       <header className="sticky top-0 z-30 bg-white/90 backdrop-blur flex items-center justify-between px-6 py-3 shadow-sm border-b border-gray-100 max-w-5xl mx-auto w-full">
         <div className="flex items-center gap-3">
           <BarChart3 className="h-8 w-8 text-blue-600" />
-          <h1 className="text-xl font-bold text-blue-900 tracking-tight">Dashboard IA</h1>
+          <h1 className="text-xl font-bold text-blue-900 tracking-tight">
+            Dashboard IA {affaireParam && <span className="text-gray-500 font-normal ml-2">Affaire {affaireParam}</span>}
+          </h1>
         </div>
         <div className="flex items-center gap-2">
           <Button variant="outline" className="flex items-center gap-1 text-sm px-3 py-1.5" onClick={handleExportAll} disabled={exporting}>
@@ -1188,8 +1198,8 @@ export default function AiDashboardPage() {
           </p>
         </div>
       </section>
-      <main className="mx-auto max-w-full py-8 px-2 w-full flex flex-row justify-end">
-        <div className="flex flex-col gap-8 w-full max-w-4xl items-end pr-4">
+      <main className="mx-auto max-w-full py-8 px-2 w-full flex flex-row justify-center">
+        <div className="flex flex-col gap-8 w-full max-w-4xl items-center mx-auto">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8 w-full">
             <div className="flex gap-4 items-center w-full sm:w-auto">
               <Select value={addType} onValueChange={setAddType}>
@@ -1219,7 +1229,15 @@ export default function AiDashboardPage() {
               color={getWidgetColor(widget.type)}
               label={getWidgetLabel(widget.type)}
               icon={getWidgetIcon(widget.type)}
-              docs={getDocsForWidget(widget.type)}
+              docs={(() => {
+                // Utilise filteredDocuments au lieu de documents
+                if (widget.type === "global") return filteredDocuments;
+                if (widget.type === "devis") return filteredDocuments.filter(doc => doc.name.toLowerCase().includes("devis") && ["pdf","doc","docx","txt"].includes(doc.type.toLowerCase()));
+                if (widget.type === "excel") return filteredDocuments.filter(doc => ["xlsx","xls","csv"].includes(doc.type.toLowerCase()));
+                if (widget.type === "pdf") return filteredDocuments.filter(doc => doc.type.toLowerCase() === "pdf" && !doc.name.toLowerCase().includes("devis"));
+                if (widget.type === "txt") return filteredDocuments.filter(doc => doc.type.toLowerCase() === "txt");
+                return [];
+              })()}
               sel={selections[widget.id] || []}
               res={results[widget.id]}
               isLoading={loading[widget.id]}
@@ -1247,6 +1265,6 @@ export default function AiDashboardPage() {
         setDragActive={setDragActive}
         fileInputRef={fileInputRef}
       />
-    </Layout>
+    </>
   )
 } 

@@ -3,17 +3,18 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { AlertTriangle, PlusCircle, ArrowUpDown, Calendar, Trash2 } from "lucide-react"
+import { AlertTriangle, PlusCircle, Trash2 } from "lucide-react"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Progress } from "@/components/ui/progress"
 import { useEffect, useState } from "react"
-import { useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation"
 
 const RISKS_CACHE_KEY = 'risks_cache_v1';
 const RISKS_CACHE_EXPIRATION_MS = 10 * 60 * 1000; // 10 minutes
 const RISKS_BLACKLIST_KEY = 'risks_blacklist_v1';
 
-export default function RisksPage() {
+export default function AffaireRisksPage() {
+  const searchParams = useSearchParams();
+  const affaireParam = searchParams?.get('affaire');
   const [risks, setRisks] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -24,35 +25,17 @@ export default function RisksPage() {
   const [deleteLoading, setDeleteLoading] = useState<string | null>(null)
   const [refreshing, setRefreshing] = useState(false)
   const [blacklist, setBlacklist] = useState<string[]>([])
-  const [deletingCache, setDeletingCache] = useState(false)
-  const [deleteCacheMsg, setDeleteCacheMsg] = useState<string|null>(null)
-
-  const searchParams = useSearchParams();
-  const affaireParam = searchParams?.get('affaire');
 
   const fetchRisks = async () => {
     setLoading(true)
     setError(null)
     try {
-      // Vérifier le cache localStorage
-      const cached = typeof window !== 'undefined' ? localStorage.getItem(RISKS_CACHE_KEY) : null;
-      if (cached) {
-        const { risks: cachedRisks, timestamp } = JSON.parse(cached);
-        if (Date.now() - timestamp < RISKS_CACHE_EXPIRATION_MS) {
-          setRisks(cachedRisks || []);
-          setLoading(false);
-          return;
-        }
-      }
-      // Sinon, appel API
       const res = await fetch("/api/risks")
       if (!res.ok) throw new Error("Erreur lors de la récupération des risques")
       const data = await res.json()
-      setRisks(data.risks || [])
-      // Mettre à jour le cache
-      if (typeof window !== 'undefined') {
-        localStorage.setItem(RISKS_CACHE_KEY, JSON.stringify({ risks: data.risks || [], timestamp: Date.now() }))
-      }
+      // Filtrer les risques par affaire si affaireParam est défini
+      const filtered = affaireParam ? (data.risks || []).filter((r: any) => r.affaire === affaireParam || (r.key && r.key.includes(affaireParam))) : (data.risks || [])
+      setRisks(filtered)
     } catch (e: any) {
       setError(e.message)
     } finally {
@@ -62,23 +45,14 @@ export default function RisksPage() {
 
   useEffect(() => {
     fetchRisks()
-  }, [])
+  }, [affaireParam])
 
-  // Charger la blacklist au montage
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const bl = localStorage.getItem(RISKS_BLACKLIST_KEY)
       if (bl) setBlacklist(JSON.parse(bl))
     }
   }, [])
-
-  // Mapping pour affichage (fallback si champ manquant)
-  function getSeverity(criticite?: string) {
-    if (!criticite) return 'secondary'
-    if (/élevée|high/i.test(criticite)) return 'destructive'
-    if (/moyenne|medium/i.test(criticite)) return 'default'
-    return 'secondary'
-  }
 
   function normalizeCriticite(criticite?: string) {
     if (!criticite) return "faible";
@@ -114,7 +88,7 @@ export default function RisksPage() {
       const res = await fetch("/api/risks", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form)
+        body: JSON.stringify({ ...form, affaire: affaireParam })
       })
       if (!res.ok) {
         const data = await res.json()
@@ -135,24 +109,12 @@ export default function RisksPage() {
     setDeleteLoading(risk.id || risk.description)
     try {
       if (risk.id) {
-        // Suppression réelle pour les risques manuels
         await fetch('/api/risks', {
           method: 'DELETE',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ id: risk.id, description: risk.description })
         })
-        // Vider le cache localStorage pour forcer le rechargement depuis l'API
-        if (typeof window !== 'undefined') {
-          localStorage.removeItem(RISKS_CACHE_KEY)
-        }
         await fetchRisks()
-      } else {
-        // Suppression locale (blacklist) pour les risques IA
-        const newBlacklist = [...blacklist, risk.description]
-        setBlacklist(newBlacklist)
-        if (typeof window !== 'undefined') {
-          localStorage.setItem(RISKS_BLACKLIST_KEY, JSON.stringify(newBlacklist))
-        }
       }
     } finally {
       setDeleteLoading(null)
@@ -162,57 +124,22 @@ export default function RisksPage() {
   const handleRefreshIA = async () => {
     setRefreshing(true)
     try {
-      await fetch('/api/risks/refresh', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ affaire: affaireParam })
-      })
-      // Vider la blacklist locale
+      await fetch('/api/risks/refresh', { method: 'POST' })
       setBlacklist([])
-      if (typeof window !== 'undefined') {
-        localStorage.removeItem(RISKS_BLACKLIST_KEY)
-      }
       await fetchRisks()
     } finally {
       setRefreshing(false)
     }
   }
 
-  const handleDeleteCache = async () => {
-    setDeletingCache(true)
-    setDeleteCacheMsg(null)
-    try {
-      const res = await fetch('/api/risks', { method: 'DELETE' })
-      const data = await res.json()
-      if (!res.ok || data.error) throw new Error(data.error || 'Erreur suppression cache')
-      setDeleteCacheMsg('Cache IA supprimé avec succès.')
-      // Vider le cache localStorage aussi côté front
-      if (typeof window !== 'undefined') {
-        localStorage.removeItem(RISKS_CACHE_KEY)
-      }
-      await fetchRisks()
-    } catch (e: any) {
-      setDeleteCacheMsg(e.message || 'Erreur suppression cache')
-    } finally {
-      setDeletingCache(false)
-    }
-  }
-
-  // Un risque manuel a un id (ajouté via POST)
-  function isManualRisk(risk: any) {
-    return !!risk.id
-  }
-
   const displayedRisks = risks.filter(risk => !blacklist.includes(risk.description))
 
   return (
-    <div className="px-4 sm:px-8 md:px-16 max-w-5xl mx-auto pb-12">
+    <div className="flex flex-col items-center mx-auto max-w-4xl w-full py-8 px-2">
       <div className="mb-8 w-full">
-        <h1 className="text-2xl font-bold text-orange-800 text-center">
-          Risques{affaireParam && <span className="text-gray-500 font-normal ml-2">- Affaire {affaireParam}</span>}
-        </h1>
+        <h1 className="text-2xl font-bold text-orange-800 text-center">Risques {affaireParam && <span className="text-gray-500 font-normal ml-2">Affaire {affaireParam}</span>}</h1>
       </div>
-      <div className="flex justify-between items-center mb-4">
+      <div className="flex justify-between items-center mb-4 w-full">
         <div className="flex items-center gap-2">
           <Badge variant="destructive" className="rounded-sm">
             {risks.filter((risk) => (risk.status || '').toLowerCase() === "open" || (risk.criticite || '').toLowerCase() === "élevée").length} Risques actifs
@@ -232,15 +159,10 @@ export default function RisksPage() {
           <Button variant="outline" onClick={handleRefreshIA} disabled={refreshing}>
             {refreshing ? "Rafraîchissement..." : "Rafraîchir IA"}
           </Button>
-          <Button variant="outline" onClick={handleDeleteCache} disabled={deletingCache}>
-            {deletingCache ? "Suppression..." : "Supprimer le cache IA"}
-          </Button>
         </div>
       </div>
-      <div className="text-xs text-gray-500 mb-4">Cliquez sur <span className="font-semibold">Rafraîchir IA</span> pour relancer l’analyse automatique des risques sur les documents de l’affaire.</div>
-      {deleteCacheMsg && <div className="text-xs mt-2 mb-2 text-center text-green-700">{deleteCacheMsg}</div>}
       {showForm && (
-        <form onSubmit={handleAddRisk} className="mb-6 p-4 border rounded bg-gray-50 flex flex-col gap-2 max-w-xl">
+        <form onSubmit={handleAddRisk} className="mb-6 p-4 border rounded bg-gray-50 flex flex-col gap-2 max-w-xl w-full">
           <div className="flex gap-2">
             <input name="description" placeholder="Description" value={form.description} onChange={handleFormChange} className="flex-1 border rounded px-2 py-1" />
             <input name="criticite" placeholder="Criticité" value={form.criticite} onChange={handleFormChange} className="flex-1 border rounded px-2 py-1" />
@@ -263,7 +185,7 @@ export default function RisksPage() {
       {loading && <div>Chargement des risques...</div>}
       {error && <div className="text-red-600">{error}</div>}
       {!loading && !error && (
-        <Card>
+        <Card className="w-full">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <AlertTriangle className="h-5 w-5 text-sncf-red" />
@@ -285,7 +207,7 @@ export default function RisksPage() {
               <TableBody>
                 {displayedRisks.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={6}>Aucun risque trouvé dans les documents.</TableCell>
+                    <TableCell colSpan={6}>Aucun risque trouvé pour cette affaire.</TableCell>
                   </TableRow>
                 )}
                 {displayedRisks.map((risk, idx) => {
@@ -324,4 +246,4 @@ export default function RisksPage() {
       )}
     </div>
   )
-}
+} 

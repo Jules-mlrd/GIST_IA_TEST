@@ -411,6 +411,15 @@ export async function POST(req: Request) {
           contextFilesText += `\n\n---\nContenu du fichier ${fileKey}:\n${text}`;
         }
       }
+      // Ajout : on lit aussi la base de données (recherche sémantique)
+      if (affaireId) {
+        semanticResults = await semanticSearchInIndexedFiles(message, affaireId);
+      } else {
+        semanticResults = await semanticSearchInFiles(message, pdfKeys, txtKeys, bucketName);
+      }
+      if (semanticResults.length > 0) {
+        semanticContext = semanticResults.map(r => `Extrait pertinent du fichier ${r.file} :\n${r.passage}`).join('\n\n');
+      }
     } else if (readFiles) {
       // Comportement normal : recherche sémantique
       if (affaireId) {
@@ -422,6 +431,135 @@ export async function POST(req: Request) {
         semanticContext = semanticResults.map(r => `Extrait pertinent du fichier ${r.file} :\n${r.passage}`).join('\n\n');
       }
     }
+    // Détection d'intention : résumé ou demande sur fichier joint
+    const resumeIntentRegex = /résum[ée]|synth[èe]se|extrait|points? clés?|fichier joint|document sélectionné|document joint|fichier sélectionné|ce fichier|ces fichiers|le fichier|les fichiers|document/i;
+    const isResumeIntent = resumeIntentRegex.test(message);
+    // Si la demande concerne un fichier joint/document sélectionné
+    // Gestion des cas multiples/ambigus
+    let ambiguousWarning = '';
+    if (isResumeIntent && Array.isArray(contextFiles) && contextFiles.length > 1) {
+      ambiguousWarning = "Plusieurs fichiers ont été sélectionnés. Propose un résumé global ou un résumé pour chaque fichier, ou demande à l'utilisateur de préciser si besoin.";
+    }
+    // Gestion des erreurs de lecture de fichiers
+    let fileErrorWarning = '';
+    if (isResumeIntent && Array.isArray(contextFiles) && contextFiles.length > 0) {
+      for (const fileKey of contextFiles) {
+        let text = '';
+        let error = '';
+        try {
+          if (/\.pdf$/i.test(fileKey)) {
+            text = await fetchPdfTextFromS3(bucketName, fileKey);
+          } else if (/\.txt$/i.test(fileKey)) {
+            text = await fetchTxtContentFromS3(bucketName, fileKey);
+          }
+          if (text.length > 20000) {
+            error = `Le fichier ${fileKey} est trop volumineux pour être résumé en une seule fois.\n`;
+            text = text.slice(0, 20000) + '\n[Texte tronqué]';
+          }
+        } catch (e) {
+          error = `Erreur de lecture du fichier ${fileKey}.\n`;
+        }
+        if (error) fileErrorWarning += error;
+        if (text) {
+          contextFilesText += `\n\n---\nContenu du fichier ${fileKey}:\n${text}`;
+        }
+      }
+      const explicitPrompt = `L’utilisateur a explicitement sélectionné les fichiers suivants pour cette question :\n${contextFiles.map(k => k.split('/').pop()).join(', ')}.\nUtilise uniquement leur contenu pour répondre à la demande.`;
+      const openaiMessages = [
+        { role: "system", content: SYSTEM_PROMPT },
+        ambiguousWarning ? { role: "system", content: ambiguousWarning } : undefined,
+        fileErrorWarning ? { role: "system", content: fileErrorWarning } : undefined,
+        { role: "system", content: explicitPrompt },
+        { role: "system", content: `Contexte extrait des fichiers sélectionnés :\n${contextFilesText}` },
+        ...memory.history.slice(-10)
+          .filter((m): m is { role: "user" | "assistant"; content: string } => !!m && (m.role === "user" || m.role === "assistant") && typeof m.content === 'string')
+          .map(m => ({
+            role: m.role === "assistant" ? "assistant" : "user",
+            content: m.content,
+          })),
+      ].filter(Boolean);
+      const response = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
+        },
+        body: JSON.stringify({
+          model: 'gpt-3.5-turbo',
+          messages: openaiMessages,
+          temperature: 0.7,
+          max_tokens: 1000,
+        }),
+      });
+      if (!response.ok) {
+        console.error('OpenAI API error:', await response.text());
+        return NextResponse.json({ reply: 'Erreur OpenAI.' }, { status: 500 });
+      }
+      const data = await response.json();
+      const reply = data.choices?.[0]?.message?.content || "Aucune réponse générée.";
+      memory.history.push({ role: "assistant", content: reply });
+      // Suggestions proactives
+      const suggestions = await generateSuggestions(
+        `Fichiers utilisés : ${contextFiles.map(k => k.split('/').pop()).join(', ')}\nQuestion : ${message}`,
+        reply,
+        message
+      );
+      // Explicabilité
+      const explicability = {
+        files: contextFiles.map(k => k.split('/').pop()),
+        prompt: openaiMessages.map(m => m.content).join('\n---\n'),
+      };
+      return NextResponse.json({ reply, suggestions, explicability });
+    }
+    // Après la gestion des fichiers sélectionnés et avant la construction du prompt openaiMessages :
+    if (isResumeIntent && (!Array.isArray(contextFiles) || contextFiles.length === 0)) {
+      // Résumé global si semanticContext existe, sinon demande de précision
+      if (semanticContext) {
+        const openaiMessages = [
+          { role: "system", content: SYSTEM_PROMPT },
+          { role: "system", content: "L'utilisateur demande un résumé global des informations disponibles. Ne résume aucun fichier précis, mais synthétise les informations générales pertinentes pour l'affaire ou le contexte." },
+          { role: "system", content: `Contexte extrait par recherche sémantique :\n${semanticContext}` },
+          ...memory.history.slice(-10)
+            .filter((m): m is { role: "user" | "assistant"; content: string } => !!m && (m.role === "user" || m.role === "assistant") && typeof m.content === 'string')
+            .map(m => ({
+              role: m.role === "assistant" ? "assistant" : "user",
+              content: m.content,
+            })),
+        ].filter(Boolean);
+        const response = await fetch('https://api.openai.com/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
+          },
+          body: JSON.stringify({
+            model: 'gpt-3.5-turbo',
+            messages: openaiMessages,
+            temperature: 0.7,
+            max_tokens: 1000,
+          }),
+        });
+        if (!response.ok) {
+          console.error('OpenAI API error:', await response.text());
+          return NextResponse.json({ reply: 'Erreur OpenAI.' }, { status: 500 });
+        }
+        const data = await response.json();
+        const reply = data.choices?.[0]?.message?.content || "Aucune réponse générée.";
+        memory.history.push({ role: "assistant", content: reply });
+        const suggestions = await generateSuggestions(
+          `Résumé global demandé.\nQuestion : ${message}`,
+          reply,
+          message
+        );
+        const explicability = {
+          files: [],
+          prompt: openaiMessages.map(m => m.content).join('\n---\n'),
+        };
+        return NextResponse.json({ reply, suggestions, explicability });
+      } else {
+        return NextResponse.json({ reply: "Pour quel(s) fichier(s) souhaitez-vous un résumé ? Veuillez sélectionner un ou plusieurs fichiers ou préciser votre demande." });
+      }
+    }
     const openaiMessages = [
       { role: "system", content: SYSTEM_PROMPT },
       contextFilesText ? { role: "system", content: `Contexte extrait des fichiers sélectionnés :\n${contextFilesText}` } : undefined,
@@ -429,10 +567,12 @@ export async function POST(req: Request) {
       memory.contextSummary ? { role: "system", content: `Résumé du contexte : ${memory.contextSummary}` } : undefined,
       memory.userGoals && memory.userGoals.length ? { role: "system", content: `Objectifs utilisateur détectés : ${memory.userGoals.join(", ")}` } : undefined,
       memory.keyEntities && memory.keyEntities.length ? { role: "system", content: `Entités clés détectées : ${memory.keyEntities.map(e => `${e.type}: ${e.value}`).join("; ")}` } : undefined,
-      ...memory.history.slice(-10).map((m) => ({
-        role: m.role === "assistant" ? "assistant" : "user",
-        content: m.content,
-      })),
+      ...memory.history.slice(-10)
+        .filter((m): m is { role: "user" | "assistant"; content: string } => !!m && (m.role === "user" || m.role === "assistant") && typeof m.content === 'string')
+        .map(m => ({
+          role: m.role === "assistant" ? "assistant" : "user",
+          content: m.content,
+        })),
     ].filter(Boolean);
     if (multiFiles.length > 1) {
       let docsText = '';
