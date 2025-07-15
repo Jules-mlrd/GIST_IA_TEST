@@ -1,7 +1,6 @@
 "use client"
 
 import { useEffect, useState, useRef } from "react"
-import { Layout } from "@/components/layout"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { FileDown, Download, FileText, FilePlus, X } from "lucide-react"
@@ -195,7 +194,8 @@ export default function DocumentsPage() {
   }
 
   return (
-    <Layout title="Documents" subtitle="Gestion documentaire du projet">
+    <div className="container mx-auto p-4">
+      <h1 className="text-2xl font-bold mb-4">Documents du projet</h1>
       <Tabs defaultValue="all" className="w-full">
         <div className="flex justify-between items-center mb-4">
           <TabsList>
@@ -331,6 +331,6 @@ export default function DocumentsPage() {
           </DialogContent>
         </Dialog>
       </Tabs>
-    </Layout>
+    </div>
   )
 }

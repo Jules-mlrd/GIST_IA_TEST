@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { PutObjectCommand } from "@aws-sdk/client-s3";
 import s3 from "@/lib/s3Client";
 import { v4 as uuidv4 } from "uuid";
+import { extractAndAnalyzeDocument, enqueuePreanalysisTask } from '@/lib/utils';
 
 export async function POST(req: Request) {
   const formData = await req.formData();
@@ -11,7 +12,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Aucun fichier reçu" }, { status: 400 });
   }
 
-  const uploaded: { fileName: string, url?: string, error?: string }[] = [];
+  const uploaded: { fileName: string, url?: string, error?: string, preAnalysis?: string }[] = [];
   for (const file of files) {
     const allowedTypes = ["application/pdf", "text/plain", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "application/vnd.ms-excel", "text/csv", "application/msword", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "text/html"];
     if (!allowedTypes.includes(file.type)) {
@@ -28,7 +29,9 @@ export async function POST(req: Request) {
     };
     try {
       await s3.send(new PutObjectCommand(uploadParams));
-      uploaded.push({ fileName });
+      // --- Pré-analyse asynchrone ---
+      await enqueuePreanalysisTask(buffer, fileName, file.type);
+      uploaded.push({ fileName, preAnalysis: 'pending' });
     } catch (err) {
       console.error("Erreur upload S3:", err);
       uploaded.push({ fileName: file.name, error: "Échec de l'upload" });

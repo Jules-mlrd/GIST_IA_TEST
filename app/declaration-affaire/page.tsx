@@ -3,7 +3,6 @@ import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Layout } from "@/components/layout";
 
 // Types
 interface S3Document {
@@ -269,221 +268,219 @@ export default function DeclarationAffairePage() {
   };
 
   return (
-    <Layout title="Déclaration d'affaire">
-      <div className="max-w-4xl mx-auto py-8 space-y-8">
-        <h1 className="text-3xl font-bold mb-2">Déclaration d'affaire</h1>
-        <p className="text-gray-600 mb-6">Remplissez ou laissez l'IA compléter automatiquement la fiche projet à partir de vos documents.</p>
+    <div className="max-w-4xl mx-auto py-8 space-y-8">
+      <h1 className="text-3xl font-bold mb-2">Déclaration d'affaire</h1>
+      <p className="text-gray-600 mb-6">Remplissez ou laissez l'IA compléter automatiquement la fiche projet à partir de vos documents.</p>
 
-        {fusionNotice && (
-          <div className="mb-4 p-3 bg-green-50 border border-green-300 rounded text-green-900">
-            {fixEncoding(fusionNotice)}
-          </div>
+      {fusionNotice && (
+        <div className="mb-4 p-3 bg-green-50 border border-green-300 rounded text-green-900">
+          {fixEncoding(fusionNotice)}
+        </div>
+      )}
+
+      {selectedS3Keys.length > 0 && (
+        <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded">
+          <div className="font-semibold text-blue-700 mb-1">Fichiers sélectionnés :</div>
+          <ul className="list-disc list-inside text-blue-900 text-sm">
+            {s3Files.filter(f => selectedS3Keys.includes(f.key)).map(f => (
+              <li key={f.key}>{f.name} <span className="text-gray-400">({f.type}, {f.size})</span></li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {summarizationNotice && (
+        <div className="mb-4 p-3 bg-yellow-50 border border-yellow-300 rounded text-yellow-900">
+          {summarizationNotice}
+        </div>
+      )}
+
+      <section className="bg-white border rounded-lg p-4 shadow-sm">
+        <h2 className="font-semibold mb-2">1. Sélectionner des fichiers du projet (S3)</h2>
+        {loadingS3 ? <div className="text-gray-500">Chargement...</div> : null}
+        {s3Error && <div className="text-red-500">{s3Error}</div>}
+        <div className="max-h-48 overflow-y-auto border rounded p-2 bg-gray-50">
+          {s3Files.length === 0 && !loadingS3 && <div className="text-gray-400 text-sm">Aucun fichier trouvé sur le bucket.</div>}
+          {s3Files.map((file) => (
+            <label key={file.key} className="flex items-center gap-2 text-sm py-1 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={selectedS3Keys.includes(file.key)}
+                onChange={() => handleS3FileToggle(file.key)}
+              />
+              <span>{file.name} <span className="text-gray-400">({file.type}, {file.size})</span></span>
+            </label>
+          ))}
+        </div>
+      </section>
+
+      <section className="bg-white border rounded-lg p-4 shadow-sm">
+        <h2 className="font-semibold mb-2">2. Importer des fichiers manuellement</h2>
+        <Input type="file" multiple onChange={handleFileChange} ref={fileInputRef} />
+        {files.length > 0 && (
+          <ul className="mt-2 text-sm text-gray-700">
+            {files.map((file, idx) => <li key={idx}>{file.name}</li>)}
+          </ul>
         )}
+        {uploadError && <div className="text-red-500">{uploadError}</div>}
+      </section>
 
-        {selectedS3Keys.length > 0 && (
-          <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded">
-            <div className="font-semibold text-blue-700 mb-1">Fichiers sélectionnés :</div>
-            <ul className="list-disc list-inside text-blue-900 text-sm">
-              {s3Files.filter(f => selectedS3Keys.includes(f.key)).map(f => (
-                <li key={f.key}>{f.name} <span className="text-gray-400">({f.type}, {f.size})</span></li>
-              ))}
-            </ul>
+      <section className="bg-white border rounded-lg p-4 shadow-sm flex flex-col gap-2">
+        <div className="flex gap-2 mb-4">
+          <Button onClick={handleAnalyze} disabled={analyzing || (selectedS3Keys.length === 0 && files.length === 0)}>
+            {analyzing ? "Analyse en cours..." : "Analyser avec l'IA"}
+          </Button>
+          <Button onClick={handleResetCache} variant="outline" disabled={resetting}>
+            {resetting ? "Reset..." : "Reset cache"}
+          </Button>
+        </div>
+        {analyzeError && <div className="text-red-500">{analyzeError}</div>}
+      </section>
+
+      <section className="bg-white border rounded-lg p-4 shadow-sm">
+        <h2 className="font-semibold mb-4">4. Fiche projet</h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <Input placeholder="Nom du projet" value={fields.projectName} onChange={e => setFields(f => ({ ...f, projectName: e.target.value }))} />
+          <Input placeholder="ID projet" value={fields.projectId} onChange={e => setFields(f => ({ ...f, projectId: e.target.value }))} />
+          <Input placeholder="Date de début" value={fields.startDate} onChange={e => setFields(f => ({ ...f, startDate: e.target.value }))} />
+          <Input placeholder="Date de fin prévue" value={fields.endDate} onChange={e => setFields(f => ({ ...f, endDate: e.target.value }))} />
+        </div>
+        <Textarea className="mt-4" placeholder="Résumé du projet" value={fields.summary} onChange={e => setFields(f => ({ ...f, summary: e.target.value }))} />
+
+        <div className="mt-4">
+          <label className="font-medium">Chef de projet</label>
+          <div className="flex gap-2 mt-1">
+            <Input placeholder="Nom" value={fields.projectManager?.name || ""} onChange={e => setFields(f => ({ ...f, projectManager: { ...f.projectManager, name: e.target.value } }))} />
+            <Input placeholder="Contact" value={fields.projectManager?.contact || ""} onChange={e => setFields(f => ({ ...f, projectManager: { ...f.projectManager, contact: e.target.value } }))} />
           </div>
-        )}
+        </div>
 
-        {summarizationNotice && (
-          <div className="mb-4 p-3 bg-yellow-50 border border-yellow-300 rounded text-yellow-900">
-            {summarizationNotice}
-          </div>
-        )}
-
-        <section className="bg-white border rounded-lg p-4 shadow-sm">
-          <h2 className="font-semibold mb-2">1. Sélectionner des fichiers du projet (S3)</h2>
-          {loadingS3 ? <div className="text-gray-500">Chargement...</div> : null}
-          {s3Error && <div className="text-red-500">{s3Error}</div>}
-          <div className="max-h-48 overflow-y-auto border rounded p-2 bg-gray-50">
-            {s3Files.length === 0 && !loadingS3 && <div className="text-gray-400 text-sm">Aucun fichier trouvé sur le bucket.</div>}
-            {s3Files.map((file) => (
-              <label key={file.key} className="flex items-center gap-2 text-sm py-1 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={selectedS3Keys.includes(file.key)}
-                  onChange={() => handleS3FileToggle(file.key)}
-                />
-                <span>{file.name} <span className="text-gray-400">({file.type}, {file.size})</span></span>
-              </label>
-            ))}
-          </div>
-        </section>
-
-        <section className="bg-white border rounded-lg p-4 shadow-sm">
-          <h2 className="font-semibold mb-2">2. Importer des fichiers manuellement</h2>
-          <Input type="file" multiple onChange={handleFileChange} ref={fileInputRef} />
-          {files.length > 0 && (
-            <ul className="mt-2 text-sm text-gray-700">
-              {files.map((file, idx) => <li key={idx}>{file.name}</li>)}
-            </ul>
-          )}
-          {uploadError && <div className="text-red-500">{uploadError}</div>}
-        </section>
-
-        <section className="bg-white border rounded-lg p-4 shadow-sm flex flex-col gap-2">
-          <div className="flex gap-2 mb-4">
-            <Button onClick={handleAnalyze} disabled={analyzing || (selectedS3Keys.length === 0 && files.length === 0)}>
-              {analyzing ? "Analyse en cours..." : "Analyser avec l'IA"}
-            </Button>
-            <Button onClick={handleResetCache} variant="outline" disabled={resetting}>
-              {resetting ? "Reset..." : "Reset cache"}
-            </Button>
-          </div>
-          {analyzeError && <div className="text-red-500">{analyzeError}</div>}
-        </section>
-
-        <section className="bg-white border rounded-lg p-4 shadow-sm">
-          <h2 className="font-semibold mb-4">4. Fiche projet</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Input placeholder="Nom du projet" value={fields.projectName} onChange={e => setFields(f => ({ ...f, projectName: e.target.value }))} />
-            <Input placeholder="ID projet" value={fields.projectId} onChange={e => setFields(f => ({ ...f, projectId: e.target.value }))} />
-            <Input placeholder="Date de début" value={fields.startDate} onChange={e => setFields(f => ({ ...f, startDate: e.target.value }))} />
-            <Input placeholder="Date de fin prévue" value={fields.endDate} onChange={e => setFields(f => ({ ...f, endDate: e.target.value }))} />
-          </div>
-          <Textarea className="mt-4" placeholder="Résumé du projet" value={fields.summary} onChange={e => setFields(f => ({ ...f, summary: e.target.value }))} />
-
-          <div className="mt-4">
-            <label className="font-medium">Chef de projet</label>
-            <div className="flex gap-2 mt-1">
-              <Input placeholder="Nom" value={fields.projectManager?.name || ""} onChange={e => setFields(f => ({ ...f, projectManager: { ...f.projectManager, name: e.target.value } }))} />
-              <Input placeholder="Contact" value={fields.projectManager?.contact || ""} onChange={e => setFields(f => ({ ...f, projectManager: { ...f.projectManager, contact: e.target.value } }))} />
+        <div className="mt-4">
+          <label className="font-medium">Membres clés</label>
+          {fields.teamMembers.map((m, idx) => (
+            <div key={idx} className="flex gap-2 mt-1">
+              <Input placeholder="Nom" value={m.name} onChange={e => setFields(f => { const arr = [...f.teamMembers]; arr[idx].name = e.target.value; return { ...f, teamMembers: arr }; })} />
+              <Input placeholder="Rôle" value={m.role} onChange={e => setFields(f => { const arr = [...f.teamMembers]; arr[idx].role = e.target.value; return { ...f, teamMembers: arr }; })} />
+              <Input placeholder="Contact" value={m.contact} onChange={e => setFields(f => { const arr = [...f.teamMembers]; arr[idx].contact = e.target.value; return { ...f, teamMembers: arr }; })} />
+              <Button type="button" variant="outline" onClick={() => setFields(f => ({ ...f, teamMembers: f.teamMembers.filter((_, i) => i !== idx) }))}>-</Button>
             </div>
-          </div>
+          ))}
+          <Button type="button" size="sm" className="mt-2" onClick={() => setFields(f => ({ ...f, teamMembers: [...f.teamMembers, { name: "", role: "", contact: "" }] }))}>Ajouter un membre</Button>
+        </div>
 
-          <div className="mt-4">
-            <label className="font-medium">Membres clés</label>
-            {fields.teamMembers.map((m, idx) => (
-              <div key={idx} className="flex gap-2 mt-1">
-                <Input placeholder="Nom" value={m.name} onChange={e => setFields(f => { const arr = [...f.teamMembers]; arr[idx].name = e.target.value; return { ...f, teamMembers: arr }; })} />
-                <Input placeholder="Rôle" value={m.role} onChange={e => setFields(f => { const arr = [...f.teamMembers]; arr[idx].role = e.target.value; return { ...f, teamMembers: arr }; })} />
-                <Input placeholder="Contact" value={m.contact} onChange={e => setFields(f => { const arr = [...f.teamMembers]; arr[idx].contact = e.target.value; return { ...f, teamMembers: arr }; })} />
-                <Button type="button" variant="outline" onClick={() => setFields(f => ({ ...f, teamMembers: f.teamMembers.filter((_, i) => i !== idx) }))}>-</Button>
-              </div>
-            ))}
-            <Button type="button" size="sm" className="mt-2" onClick={() => setFields(f => ({ ...f, teamMembers: [...f.teamMembers, { name: "", role: "", contact: "" }] }))}>Ajouter un membre</Button>
-          </div>
-
-          <div className="mt-4">
-            <label className="font-medium">Partenaires</label>
-            {fields.partners.map((p, idx) => (
-              <div key={idx} className="flex gap-2 mt-1">
-                <Input value={p} onChange={e => setFields(f => { const arr = [...f.partners]; arr[idx] = e.target.value; return { ...f, partners: arr }; })} />
-                <Button type="button" variant="outline" onClick={() => setFields(f => ({ ...f, partners: f.partners.filter((_, i) => i !== idx) }))}>-</Button>
-              </div>
-            ))}
-            <Button type="button" size="sm" className="mt-2" onClick={() => setFields(f => ({ ...f, partners: [...f.partners, ""] }))}>Ajouter un partenaire</Button>
-          </div>
-
-          <div className="mt-4">
-            <label className="font-medium">Budget</label>
-            <div className="flex gap-2 mt-1">
-              <Input placeholder="Total" value={fields.budget.total} onChange={e => setFields(f => ({ ...f, budget: { ...f.budget, total: e.target.value } }))} />
-              <Input placeholder="Utilisé" value={fields.budget.used} onChange={e => setFields(f => ({ ...f, budget: { ...f.budget, used: e.target.value } }))} />
-              <Input placeholder="Restant" value={fields.budget.remaining} onChange={e => setFields(f => ({ ...f, budget: { ...f.budget, remaining: e.target.value } }))} />
+        <div className="mt-4">
+          <label className="font-medium">Partenaires</label>
+          {fields.partners.map((p, idx) => (
+            <div key={idx} className="flex gap-2 mt-1">
+              <Input value={p} onChange={e => setFields(f => { const arr = [...f.partners]; arr[idx] = e.target.value; return { ...f, partners: arr }; })} />
+              <Button type="button" variant="outline" onClick={() => setFields(f => ({ ...f, partners: f.partners.filter((_, i) => i !== idx) }))}>-</Button>
             </div>
-            <div className="mt-2">
-              <label className="text-sm">Postes de dépense</label>
-              {fields.budget.mainExpenses.map((exp, idx) => (
-                <div key={idx} className="flex gap-2 mt-1">
-                  <Input placeholder="Label" value={exp.label} onChange={e => setFields(f => { const arr = [...f.budget.mainExpenses]; arr[idx].label = e.target.value; return { ...f, budget: { ...f.budget, mainExpenses: arr } }; })} />
-                  <Input placeholder="Montant" value={exp.amount} onChange={e => setFields(f => { const arr = [...f.budget.mainExpenses]; arr[idx].amount = e.target.value; return { ...f, budget: { ...f.budget, mainExpenses: arr } }; })} />
-                  <Button type="button" variant="outline" onClick={() => setFields(f => ({ ...f, budget: { ...f.budget, mainExpenses: f.budget.mainExpenses.filter((_, i) => i !== idx) } }))}>-</Button>
-                </div>
-              ))}
-              <Button type="button" size="sm" className="mt-2" onClick={() => setFields(f => ({ ...f, budget: { ...f.budget, mainExpenses: [...f.budget.mainExpenses, { label: "", amount: "" }] } }))}>Ajouter un poste</Button>
+          ))}
+          <Button type="button" size="sm" className="mt-2" onClick={() => setFields(f => ({ ...f, partners: [...f.partners, ""] }))}>Ajouter un partenaire</Button>
+        </div>
+
+        <div className="mt-4">
+          <label className="font-medium">Budget</label>
+          <div className="flex gap-2 mt-1">
+            <Input placeholder="Total" value={fields.budget.total} onChange={e => setFields(f => ({ ...f, budget: { ...f.budget, total: e.target.value } }))} />
+            <Input placeholder="Utilisé" value={fields.budget.used} onChange={e => setFields(f => ({ ...f, budget: { ...f.budget, used: e.target.value } }))} />
+            <Input placeholder="Restant" value={fields.budget.remaining} onChange={e => setFields(f => ({ ...f, budget: { ...f.budget, remaining: e.target.value } }))} />
+          </div>
+          <div className="mt-2">
+            <label className="text-sm">Postes de dépense</label>
+            {fields.budget.mainExpenses.map((exp, idx) => (
+              <div key={idx} className="flex gap-2 mt-1">
+                <Input placeholder="Label" value={exp.label} onChange={e => setFields(f => { const arr = [...f.budget.mainExpenses]; arr[idx].label = e.target.value; return { ...f, budget: { ...f.budget, mainExpenses: arr } }; })} />
+                <Input placeholder="Montant" value={exp.amount} onChange={e => setFields(f => { const arr = [...f.budget.mainExpenses]; arr[idx].amount = e.target.value; return { ...f, budget: { ...f.budget, mainExpenses: arr } }; })} />
+                <Button type="button" variant="outline" onClick={() => setFields(f => ({ ...f, budget: { ...f.budget, mainExpenses: f.budget.mainExpenses.filter((_, i) => i !== idx) } }))}>-</Button>
+              </div>
+            ))}
+            <Button type="button" size="sm" className="mt-2" onClick={() => setFields(f => ({ ...f, budget: { ...f.budget, mainExpenses: [...f.budget.mainExpenses, { label: "", amount: "" }] } }))}>Ajouter un poste</Button>
+          </div>
+          <div className="mt-2">
+            <label className="text-sm">Alertes budget</label>
+            {fields.budget.alerts.map((a, idx) => (
+              <div key={idx} className="flex gap-2 mt-1">
+                <Input value={a} onChange={e => setFields(f => { const arr = [...f.budget.alerts]; arr[idx] = e.target.value; return { ...f, budget: { ...f.budget, alerts: arr } }; })} />
+                <Button type="button" variant="outline" onClick={() => setFields(f => ({ ...f, budget: { ...f.budget, alerts: f.budget.alerts.filter((_, i) => i !== idx) } }))}>-</Button>
+              </div>
+            ))}
+            <Button type="button" size="sm" className="mt-2" onClick={() => setFields(f => ({ ...f, budget: { ...f.budget, alerts: [...f.budget.alerts, ""] } }))}>Ajouter une alerte</Button>
+          </div>
+        </div>
+
+        <div className="mt-4">
+          <label className="font-medium">Jalons</label>
+          {fields.milestones.map((m, idx) => (
+            <div key={idx} className="flex gap-2 mt-1">
+              <Input placeholder="Date" value={m.date} onChange={e => setFields(f => { const arr = [...f.milestones]; arr[idx].date = e.target.value; return { ...f, milestones: arr }; })} />
+              <Input placeholder="Intitulé" value={m.label} onChange={e => setFields(f => { const arr = [...f.milestones]; arr[idx].label = e.target.value; return { ...f, milestones: arr }; })} />
+              <Button type="button" variant="outline" onClick={() => setFields(f => ({ ...f, milestones: f.milestones.filter((_, i) => i !== idx) }))}>-</Button>
             </div>
-            <div className="mt-2">
-              <label className="text-sm">Alertes budget</label>
-              {fields.budget.alerts.map((a, idx) => (
-                <div key={idx} className="flex gap-2 mt-1">
-                  <Input value={a} onChange={e => setFields(f => { const arr = [...f.budget.alerts]; arr[idx] = e.target.value; return { ...f, budget: { ...f.budget, alerts: arr } }; })} />
-                  <Button type="button" variant="outline" onClick={() => setFields(f => ({ ...f, budget: { ...f.budget, alerts: f.budget.alerts.filter((_, i) => i !== idx) } }))}>-</Button>
-                </div>
-              ))}
-              <Button type="button" size="sm" className="mt-2" onClick={() => setFields(f => ({ ...f, budget: { ...f.budget, alerts: [...f.budget.alerts, ""] } }))}>Ajouter une alerte</Button>
+          ))}
+          <Button type="button" size="sm" className="mt-2" onClick={() => setFields(f => ({ ...f, milestones: [...f.milestones, { date: "", label: "" }] }))}>Ajouter un jalon</Button>
+        </div>
+
+        <div className="mt-4">
+          <label className="font-medium">Livrables</label>
+          {fields.deliverables.map((d, idx) => (
+            <div key={idx} className="flex gap-2 mt-1">
+              <Input placeholder="Label" value={d.label} onChange={e => setFields(f => { const arr = [...f.deliverables]; arr[idx].label = e.target.value; return { ...f, deliverables: arr }; })} />
+              <Input placeholder="Statut" value={d.status} onChange={e => setFields(f => { const arr = [...f.deliverables]; arr[idx].status = e.target.value; return { ...f, deliverables: arr }; })} />
+              <Button type="button" variant="outline" onClick={() => setFields(f => ({ ...f, deliverables: f.deliverables.filter((_, i) => i !== idx) }))}>-</Button>
             </div>
-          </div>
+          ))}
+          <Button type="button" size="sm" className="mt-2" onClick={() => setFields(f => ({ ...f, deliverables: [...f.deliverables, { label: "", status: "" }] }))}>Ajouter un livrable</Button>
+        </div>
 
-          <div className="mt-4">
-            <label className="font-medium">Jalons</label>
-            {fields.milestones.map((m, idx) => (
-              <div key={idx} className="flex gap-2 mt-1">
-                <Input placeholder="Date" value={m.date} onChange={e => setFields(f => { const arr = [...f.milestones]; arr[idx].date = e.target.value; return { ...f, milestones: arr }; })} />
-                <Input placeholder="Intitulé" value={m.label} onChange={e => setFields(f => { const arr = [...f.milestones]; arr[idx].label = e.target.value; return { ...f, milestones: arr }; })} />
-                <Button type="button" variant="outline" onClick={() => setFields(f => ({ ...f, milestones: f.milestones.filter((_, i) => i !== idx) }))}>-</Button>
-              </div>
-            ))}
-            <Button type="button" size="sm" className="mt-2" onClick={() => setFields(f => ({ ...f, milestones: [...f.milestones, { date: "", label: "" }] }))}>Ajouter un jalon</Button>
-          </div>
-
-          <div className="mt-4">
-            <label className="font-medium">Livrables</label>
-            {fields.deliverables.map((d, idx) => (
-              <div key={idx} className="flex gap-2 mt-1">
-                <Input placeholder="Label" value={d.label} onChange={e => setFields(f => { const arr = [...f.deliverables]; arr[idx].label = e.target.value; return { ...f, deliverables: arr }; })} />
-                <Input placeholder="Statut" value={d.status} onChange={e => setFields(f => { const arr = [...f.deliverables]; arr[idx].status = e.target.value; return { ...f, deliverables: arr }; })} />
-                <Button type="button" variant="outline" onClick={() => setFields(f => ({ ...f, deliverables: f.deliverables.filter((_, i) => i !== idx) }))}>-</Button>
-              </div>
-            ))}
-            <Button type="button" size="sm" className="mt-2" onClick={() => setFields(f => ({ ...f, deliverables: [...f.deliverables, { label: "", status: "" }] }))}>Ajouter un livrable</Button>
-          </div>
-
-          <div className="mt-4">
-            <label className="font-medium">Risques</label>
-            {fields.risks.map((r, idx) => (
-              <div key={idx} className="flex gap-2 mt-1">
-                <Input placeholder="Description" value={r.description} onChange={e => setFields(f => { const arr = [...f.risks]; arr[idx].description = e.target.value; return { ...f, risks: arr }; })} />
-                <Input placeholder="Criticité" value={r.level} onChange={e => setFields(f => { const arr = [...f.risks]; arr[idx].level = e.target.value; return { ...f, risks: arr }; })} />
-                <Input placeholder="Responsable" value={r.owner} onChange={e => setFields(f => { const arr = [...f.risks]; arr[idx].owner = e.target.value; return { ...f, risks: arr }; })} />
-                <Button type="button" variant="outline" onClick={() => setFields(f => ({ ...f, risks: f.risks.filter((_, i) => i !== idx) }))}>-</Button>
-              </div>
-            ))}
-            <Button type="button" size="sm" className="mt-2" onClick={() => setFields(f => ({ ...f, risks: [...f.risks, { description: "", level: "", owner: "" }] }))}>Ajouter un risque</Button>
-          </div>
-
-          <div className="mt-4">
-            <label className="font-medium">Contacts importants</label>
-            {fields.contacts.map((c, idx) => (
-              <div key={idx} className="flex gap-2 mt-1">
-                <Input placeholder="Nom" value={c.name} onChange={e => setFields(f => { const arr = [...f.contacts]; arr[idx].name = e.target.value; return { ...f, contacts: arr }; })} />
-                <Input placeholder="Rôle" value={c.role} onChange={e => setFields(f => { const arr = [...f.contacts]; arr[idx].role = e.target.value; return { ...f, contacts: arr }; })} />
-                <Input placeholder="Contact" value={c.contact} onChange={e => setFields(f => { const arr = [...f.contacts]; arr[idx].contact = e.target.value; return { ...f, contacts: arr }; })} />
-                <Button type="button" variant="outline" onClick={() => setFields(f => ({ ...f, contacts: f.contacts.filter((_, i) => i !== idx) }))}>-</Button>
-              </div>
-            ))}
-            <Button type="button" size="sm" className="mt-2" onClick={() => setFields(f => ({ ...f, contacts: [...f.contacts, { name: "", role: "", contact: "" }] }))}>Ajouter un contact</Button>
-          </div>
-
-          <Textarea className="mt-4" placeholder="Mentions légales ou contractuelles" value={fields.legal} onChange={e => setFields(f => ({ ...f, legal: e.target.value }))} />
-
-          <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Input placeholder="Avancement (%)" value={fields.progress} onChange={e => setFields(f => ({ ...f, progress: e.target.value }))} />
-            <div>
-              <label className="font-medium">Alertes planning</label>
-              {fields.scheduleAlerts.map((a, idx) => (
-                <div key={idx} className="flex gap-2 mt-1">
-                  <Input value={a} onChange={e => setFields(f => { const arr = [...f.scheduleAlerts]; arr[idx] = e.target.value; return { ...f, scheduleAlerts: arr }; })} />
-                  <Button type="button" variant="outline" onClick={() => setFields(f => ({ ...f, scheduleAlerts: f.scheduleAlerts.filter((_, i) => i !== idx) }))}>-</Button>
-                </div>
-              ))}
-              <Button type="button" size="sm" className="mt-2" onClick={() => setFields(f => ({ ...f, scheduleAlerts: [...f.scheduleAlerts, ""] }))}>Ajouter une alerte</Button>
+        <div className="mt-4">
+          <label className="font-medium">Risques</label>
+          {fields.risks.map((r, idx) => (
+            <div key={idx} className="flex gap-2 mt-1">
+              <Input placeholder="Description" value={r.description} onChange={e => setFields(f => { const arr = [...f.risks]; arr[idx].description = e.target.value; return { ...f, risks: arr }; })} />
+              <Input placeholder="Criticité" value={r.level} onChange={e => setFields(f => { const arr = [...f.risks]; arr[idx].level = e.target.value; return { ...f, risks: arr }; })} />
+              <Input placeholder="Responsable" value={r.owner} onChange={e => setFields(f => { const arr = [...f.risks]; arr[idx].owner = e.target.value; return { ...f, risks: arr }; })} />
+              <Button type="button" variant="outline" onClick={() => setFields(f => ({ ...f, risks: f.risks.filter((_, i) => i !== idx) }))}>-</Button>
             </div>
+          ))}
+          <Button type="button" size="sm" className="mt-2" onClick={() => setFields(f => ({ ...f, risks: [...f.risks, { description: "", level: "", owner: "" }] }))}>Ajouter un risque</Button>
+        </div>
+
+        <div className="mt-4">
+          <label className="font-medium">Contacts importants</label>
+          {fields.contacts.map((c, idx) => (
+            <div key={idx} className="flex gap-2 mt-1">
+              <Input placeholder="Nom" value={c.name} onChange={e => setFields(f => { const arr = [...f.contacts]; arr[idx].name = e.target.value; return { ...f, contacts: arr }; })} />
+              <Input placeholder="Rôle" value={c.role} onChange={e => setFields(f => { const arr = [...f.contacts]; arr[idx].role = e.target.value; return { ...f, contacts: arr }; })} />
+              <Input placeholder="Contact" value={c.contact} onChange={e => setFields(f => { const arr = [...f.contacts]; arr[idx].contact = e.target.value; return { ...f, contacts: arr }; })} />
+              <Button type="button" variant="outline" onClick={() => setFields(f => ({ ...f, contacts: f.contacts.filter((_, i) => i !== idx) }))}>-</Button>
+            </div>
+          ))}
+          <Button type="button" size="sm" className="mt-2" onClick={() => setFields(f => ({ ...f, contacts: [...f.contacts, { name: "", role: "", contact: "" }] }))}>Ajouter un contact</Button>
+        </div>
+
+        <Textarea className="mt-4" placeholder="Mentions légales ou contractuelles" value={fields.legal} onChange={e => setFields(f => ({ ...f, legal: e.target.value }))} />
+
+        <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+          <Input placeholder="Avancement (%)" value={fields.progress} onChange={e => setFields(f => ({ ...f, progress: e.target.value }))} />
+          <div>
+            <label className="font-medium">Alertes planning</label>
+            {fields.scheduleAlerts.map((a, idx) => (
+              <div key={idx} className="flex gap-2 mt-1">
+                <Input value={a} onChange={e => setFields(f => { const arr = [...f.scheduleAlerts]; arr[idx] = e.target.value; return { ...f, scheduleAlerts: arr }; })} />
+                <Button type="button" variant="outline" onClick={() => setFields(f => ({ ...f, scheduleAlerts: f.scheduleAlerts.filter((_, i) => i !== idx) }))}>-</Button>
+              </div>
+            ))}
+            <Button type="button" size="sm" className="mt-2" onClick={() => setFields(f => ({ ...f, scheduleAlerts: [...f.scheduleAlerts, ""] }))}>Ajouter une alerte</Button>
           </div>
+        </div>
 
-          <Textarea className="mt-4" placeholder="Commentaires libres" value={fields.comments} onChange={e => setFields(f => ({ ...f, comments: e.target.value }))} />
-        </section>
+        <Textarea className="mt-4" placeholder="Commentaires libres" value={fields.comments} onChange={e => setFields(f => ({ ...f, comments: e.target.value }))} />
+      </section>
 
-        <section className="bg-white border rounded-lg p-4 shadow-sm flex flex-col gap-2">
-          <Button onClick={handleExportPDF} variant="outline">Exporter en PDF</Button>
-        </section>
-      </div>
-    </Layout>
+      <section className="bg-white border rounded-lg p-4 shadow-sm flex flex-col gap-2">
+        <Button onClick={handleExportPDF} variant="outline">Exporter en PDF</Button>
+      </section>
+    </div>
   );
 } 

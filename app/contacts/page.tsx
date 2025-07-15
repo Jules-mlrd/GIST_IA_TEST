@@ -1,16 +1,13 @@
 "use client"
 
-import { Layout } from "@/components/layout"
 import { Card, CardContent } from "@/components/ui/card"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
-import { Mail, Phone, UserPlus, Trash2 } from "lucide-react"
+import { Mail, Phone } from "lucide-react"
 import { useEffect, useState } from "react"
-
-function isInternal(email?: string) {
-  return email && email.endsWith("@sncf.fr")
-}
+import { useSearchParams } from "next/navigation"
+import { useRouter } from "next/navigation"
 
 function getFullName(contact: any) {
   if (contact.prenom || contact.nom) {
@@ -19,52 +16,40 @@ function getFullName(contact: any) {
   return contact.name || "Nom inconnu"
 }
 
-const emptyContact = { prenom: "", nom: "", email: "", telephone: "", societe: "", role: "" }
-
-const CACHE_KEY = 'contacts_cache_v1';
-const CACHE_EXPIRATION_MS = 10 * 60 * 1000; // 10 minutes
-
 export default function ContactsPage() {
   const [contacts, setContacts] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [search, setSearch] = useState("")
-  const [showForm, setShowForm] = useState(false)
-  const [form, setForm] = useState({ ...emptyContact })
-  const [formError, setFormError] = useState<string | null>(null)
-  const [formLoading, setFormLoading] = useState(false)
-  const [deleteLoading, setDeleteLoading] = useState<string | null>(null)
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const affaire = searchParams?.get("affaire") || "";
+  const [refreshing, setRefreshing] = useState(false);
 
-  const fetchContacts = async () => {
-    setLoading(true)
-    setError(null)
-    try {
-      const cached = typeof window !== 'undefined' ? localStorage.getItem(CACHE_KEY) : null;
-      if (cached) {
-        const { contacts: cachedContacts, timestamp } = JSON.parse(cached);
-        if (Date.now() - timestamp < CACHE_EXPIRATION_MS) {
-          setContacts(cachedContacts || []);
+  useEffect(() => {
+    const fetchAffaireContacts = async () => {
+      setLoading(true)
+      setError(null)
+      try {
+        if (!affaire) {
+          setError("Aucune affaire sélectionnée.");
+          setContacts([]);
           setLoading(false);
           return;
         }
+        const res = await fetch(`/api/contacts?affaire=${encodeURIComponent(affaire)}`)
+        if (!res.ok) throw new Error("Erreur lors de la récupération des contacts de l'affaire")
+        const data = await res.json()
+        setContacts(data.contacts || [])
+      } catch (e: any) {
+        setError(e.message)
+        setContacts([])
+      } finally {
+        setLoading(false)
       }
-      const res = await fetch("/api/contacts")
-      if (!res.ok) throw new Error("Erreur lors de la récupération des contacts")
-      const data = await res.json()
-      setContacts(data.contacts || [])
-      if (typeof window !== 'undefined') {
-        localStorage.setItem(CACHE_KEY, JSON.stringify({ contacts: data.contacts || [], timestamp: Date.now() }))
-      }
-    } catch (e: any) {
-      setError(e.message)
-    } finally {
-      setLoading(false)
     }
-  }
-
-  useEffect(() => {
-    fetchContacts()
-  }, [])
+    fetchAffaireContacts()
+  }, [affaire])
 
   const filteredContacts = contacts.filter(contact => {
     const q = search.toLowerCase()
@@ -77,211 +62,89 @@ export default function ContactsPage() {
     )
   })
 
-  const internalContacts = filteredContacts.filter(c => isInternal(c.email))
-  const externalContacts = filteredContacts.filter(c => !isInternal(c.email))
-
-  const handleFormChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setForm({ ...form, [e.target.name]: e.target.value })
-  }
-
-  const handleAddContact = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setFormError(null)
-    if (!form.email && !form.telephone) {
-      setFormError("Email ou téléphone requis.")
-      return
-    }
-    setFormLoading(true)
-    try {
-      const res = await fetch("/api/contacts", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form)
-      })
-      if (!res.ok) {
-        const data = await res.json()
-        setFormError(data.error || "Erreur lors de l'ajout")
-      } else {
-        setShowForm(false)
-        setForm({ ...emptyContact })
-        await fetchContacts()
-      }
-    } catch {
-      setFormError("Erreur lors de l'ajout")
-    } finally {
-      setFormLoading(false)
-    }
-  }
-
-  const handleDeleteContact = async (contact: any) => {
-    setDeleteLoading((contact.email || contact.telephone) ?? '')
-    try {
-      const res = await fetch('/api/contacts', {
-        method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: contact.email, telephone: contact.telephone })
-      })
-      await fetchContacts()
-    } finally {
-      setDeleteLoading(null)
-    }
-  }
-
-  function isManualContact(contact: any) {
-    
-    return true
-  }
-
   return (
-    <Layout title="Contacts" subtitle="Contacts extraits automatiquement des documents du projet">
-      <div className="mb-4 flex flex-col md:flex-row md:items-center md:justify-between gap-2">
-        <Button className="bg-sncf-red hover:bg-red-700" onClick={() => setShowForm(v => !v)}>
-          <UserPlus className="mr-2 h-4 w-4" />
-          Ajouter un contact
-        </Button>
+    <div className="w-full max-w-none py-8 px-2 md:px-8">
+      {affaire && (
+        <div className="mb-6 flex justify-start gap-4 items-center">
+          <a
+            href={`/affaires/${affaire}`}
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-sncf-red text-white font-semibold text-base shadow hover:bg-red-700 transition-colors focus:outline-none focus:ring-2 focus:ring-sncf-red focus:ring-offset-2"
+            title={`Retour à l'affaire ${affaire}`}
+          >
+            <span className="text-lg">←</span>
+            Affaire {affaire}
+          </a>
+          <button
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-gray-200 text-gray-800 font-semibold text-base shadow hover:bg-gray-300 transition-colors focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-offset-2"
+            disabled={refreshing}
+            onClick={async () => {
+              setRefreshing(true);
+              await fetch(`/api/contacts?affaire=${encodeURIComponent(affaire)}&refresh=1`);
+              setRefreshing(false);
+              router.refresh();
+            }}
+            title="Rafraîchir les contacts de l'affaire"
+          >
+            {refreshing ? 'Rafraîchissement...' : 'Rafraîchir les contacts'}
+          </button>
+        </div>
+      )}
+      <div className="flex items-center gap-3 mb-10">
+        <div className="bg-sncf-red rounded-full p-3 flex items-center justify-center">
+          <Mail className="h-7 w-7 text-white" />
+        </div>
+        <h1 className="text-lg font-bold text-sncf-red tracking-tight">Contacts de l'affaire</h1>
+      </div>
+      <div className="mb-10 flex flex-col md:flex-row md:items-center md:justify-between gap-2">
         <Input
           type="text"
           placeholder="Rechercher un contact..."
           value={search}
           onChange={e => setSearch(e.target.value)}
-          className="max-w-xs"
+          className="max-w-md border-gray-300 text-base shadow-sm"
         />
       </div>
-      {showForm && (
-        <form onSubmit={handleAddContact} className="mb-6 p-4 border rounded bg-gray-50 flex flex-col gap-2 max-w-xl">
-          <div className="flex gap-2">
-            <Input name="prenom" placeholder="Prénom" value={form.prenom} onChange={handleFormChange} />
-            <Input name="nom" placeholder="Nom" value={form.nom} onChange={handleFormChange} />
-          </div>
-          <div className="flex gap-2">
-            <Input name="email" placeholder="Email" value={form.email} onChange={handleFormChange} type="email" />
-            <Input name="telephone" placeholder="Téléphone" value={form.telephone} onChange={handleFormChange} />
-          </div>
-          <div className="flex gap-2">
-            <Input name="societe" placeholder="Société" value={form.societe} onChange={handleFormChange} />
-            <Input name="role" placeholder="Rôle" value={form.role} onChange={handleFormChange} />
-          </div>
-          {formError && <div className="text-red-600 text-sm">{formError}</div>}
-          <div className="flex gap-2 mt-2">
-            <Button type="submit" className="bg-sncf-red" disabled={formLoading}>
-              {formLoading ? "Ajout..." : "Ajouter"}
-            </Button>
-            <Button type="button" variant="outline" onClick={() => setShowForm(false)} disabled={formLoading}>
-              Annuler
-            </Button>
-          </div>
-        </form>
-      )}
-      {loading && <div>Chargement des contacts...</div>}
-      {error && <div className="text-red-600">{error}</div>}
+      {loading && <div className="text-gray-500 text-base">Chargement des contacts extraits des fichiers de l'affaire...</div>}
+      {error && <div className="text-red-600 font-semibold text-base">{error}</div>}
       {!loading && !error && (
-        <>
-          <h2 className="text-lg font-semibold mb-2 mt-4">Équipe projet (SNCF)</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {internalContacts.length === 0 && <div>Aucun contact interne trouvé.</div>}
-            {internalContacts.map((contact, index) => (
-              <Card key={index}>
-                <CardContent className="p-6">
-                  <div className="flex items-start gap-4">
-                    <Avatar className="h-12 w-12">
-                      <AvatarFallback className="bg-sncf-red text-white">
-                        {getFullName(contact).split(" ").map((n: string) => n[0]).join("") || "?"}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div className="flex-1">
-                      <h3 className="font-medium text-gray-900">{getFullName(contact)}</h3>
-                      {contact.role && <div className="text-sm text-gray-500">{contact.role}</div>}
-                      {contact.societe && <div className="text-xs text-gray-400">{contact.societe}</div>}
-                      <div className="mt-3 space-y-1">
-                        {contact.email && (
-                          <div className="flex items-center text-sm">
-                            <Mail className="h-3.5 w-3.5 mr-2 text-gray-500" />
-                            <a href={`mailto:${contact.email}`} className="text-gray-600 hover:text-sncf-red">
-                              {contact.email}
-                            </a>
-                          </div>
-                        )}
-                        {contact.telephone && (
-                          <div className="flex items-center text-sm">
-                            <Phone className="h-3.5 w-3.5 mr-2 text-gray-500" />
-                            <a href={`tel:${contact.telephone}`} className="text-gray-600 hover:text-sncf-red">
-                              {contact.telephone}
-                            </a>
-                          </div>
-                        )}
+        <div className="flex flex-col gap-8">
+          {filteredContacts.length === 0 && <div className="text-gray-400 text-center text-base">Aucun contact trouvé dans les fichiers de l'affaire.</div>}
+          {filteredContacts.map((contact, index) => (
+            <Card key={index} className="shadow-lg border-0 bg-white w-full">
+              <CardContent className="flex flex-row items-center gap-8 p-8 min-h-[120px] w-full">
+                <Avatar className="h-16 w-16 min-w-16">
+                  <AvatarFallback className="bg-sncf-red text-white text-base font-bold">
+                    {getFullName(contact).split(" ").map((n: string) => n[0]).join("") || "?"}
+                  </AvatarFallback>
+                </Avatar>
+                <div className="flex-1 min-w-0">
+                  <h3 className="font-bold text-base text-gray-900 truncate" title={getFullName(contact)}>{getFullName(contact)}</h3>
+                  {contact.role && <div className="text-sm text-gray-500 truncate" title={contact.role}>{contact.role}</div>}
+                  {contact.societe && <div className="text-sm text-gray-400 truncate" title={contact.societe}>{contact.societe}</div>}
+                  <div className="mt-2 flex flex-row gap-8 flex-wrap items-center">
+                    {contact.email && (
+                      <div className="flex items-center text-base truncate" title={contact.email}>
+                        <Mail className="h-4 w-4 mr-2 text-gray-500" />
+                        <a href={`mailto:${contact.email}`} className="text-gray-700 hover:text-sncf-red truncate" style={{maxWidth:'320px', display:'inline-block', verticalAlign:'bottom', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap'}}>
+                          {contact.email}
+                        </a>
                       </div>
-                      {isManualContact(contact) && (
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="text-red-600 hover:bg-red-100 ml-auto mt-2"
-                          onClick={() => handleDeleteContact(contact)}
-                          disabled={deleteLoading === (contact.email || contact.telephone)}
-                          title="Supprimer le contact"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
-                      )}
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-          <h2 className="text-lg font-semibold mb-2 mt-8">Contacts externes</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {externalContacts.length === 0 && <div>Aucun contact externe trouvé.</div>}
-            {externalContacts.map((contact, index) => (
-              <Card key={index}>
-                <CardContent className="p-6">
-                  <div className="flex items-start gap-4">
-                    <Avatar className="h-12 w-12">
-                      <AvatarFallback className="bg-gray-200 text-gray-700">
-                        {getFullName(contact).split(" ").map((n: string) => n[0]).join("") || "?"}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div className="flex-1">
-                      <h3 className="font-medium text-gray-900">{getFullName(contact)}</h3>
-                      {contact.role && <div className="text-sm text-gray-500">{contact.role}</div>}
-                      {contact.societe && <div className="text-xs text-gray-400">{contact.societe}</div>}
-                      <div className="mt-3 space-y-1">
-                        {contact.email && (
-                          <div className="flex items-center text-sm">
-                            <Mail className="h-3.5 w-3.5 mr-2 text-gray-500" />
-                            <a href={`mailto:${contact.email}`} className="text-gray-600 hover:text-sncf-red">
-                              {contact.email}
-                            </a>
-                          </div>
-                        )}
-                        {contact.telephone && (
-                          <div className="flex items-center text-sm">
-                            <Phone className="h-3.5 w-3.5 mr-2 text-gray-500" />
-                            <a href={`tel:${contact.telephone}`} className="text-gray-600 hover:text-sncf-red">
-                              {contact.telephone}
-                            </a>
-                          </div>
-                        )}
+                    )}
+                    {contact.telephone && (
+                      <div className="flex items-center text-base truncate" title={contact.telephone}>
+                        <Phone className="h-4 w-4 mr-2 text-gray-500" />
+                        <a href={`tel:${contact.telephone}`} className="text-gray-700 hover:text-sncf-red truncate" style={{maxWidth:'200px', display:'inline-block', verticalAlign:'bottom', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap'}}>
+                          {contact.telephone}
+                        </a>
                       </div>
-                      {isManualContact(contact) && (
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="text-red-600 hover:bg-red-100 ml-auto mt-2"
-                          onClick={() => handleDeleteContact(contact)}
-                          disabled={deleteLoading === (contact.email || contact.telephone)}
-                          title="Supprimer le contact"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
-                      )}
-                    </div>
+                    )}
                   </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        </>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
       )}
-    </Layout>
+    </div>
   )
 }

@@ -1,4 +1,4 @@
-import { S3Client, GetObjectCommand } from "@aws-sdk/client-s3"
+import { S3Client, GetObjectCommand, PutObjectCommand } from "@aws-sdk/client-s3"
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner"
 
 const s3 = new S3Client({
@@ -44,6 +44,33 @@ export async function fetchUserCredentialsFromS3() {
   } catch (err) {
     console.error("Failed to fetch credentials from S3:", err)
     return null
+  }
+}
+
+export async function writeJsonToS3(bucket: string, key: string, data: any) {
+  const body = typeof data === 'string' ? data : JSON.stringify(data, null, 2);
+  const command = new PutObjectCommand({
+    Bucket: bucket,
+    Key: key,
+    Body: body,
+    ContentType: 'application/json',
+  });
+  await s3.send(command);
+}
+
+export async function readJsonFromS3(bucket: string, key: string): Promise<any | null> {
+  try {
+    const command = new GetObjectCommand({ Bucket: bucket, Key: key });
+    const data = await s3.send(command);
+    if (!data.Body) return null;
+    const chunks: Buffer[] = [];
+    for await (const chunk of data.Body as any) {
+      chunks.push(Buffer.from(chunk));
+    }
+    const jsonStr = Buffer.concat(chunks).toString('utf-8');
+    return JSON.parse(jsonStr);
+  } catch (e) {
+    return null;
   }
 }
 

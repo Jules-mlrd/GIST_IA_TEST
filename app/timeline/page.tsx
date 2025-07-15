@@ -1,6 +1,5 @@
 "use client"
 
-import { Layout } from "@/components/layout"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -125,7 +124,7 @@ const tasks = [
 
 export default function TimelinePage() {
   return (
-    <Layout title="Timeline" subtitle="Chronologie et planification du projet">
+    <>
       <div className="flex justify-between items-center mb-4">
         <div className="flex items-center gap-2">
           <Button variant="outline" size="sm">
@@ -272,6 +271,6 @@ export default function TimelinePage() {
           </Card>
         </TabsContent>
       </Tabs>
-    </Layout>
-  )
+    </>
+  );
 }

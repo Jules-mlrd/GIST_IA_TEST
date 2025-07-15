@@ -1,5 +1,8 @@
 import { clsx, type ClassValue } from "clsx"
 import { twMerge } from "tailwind-merge"
+import { fetchTxtContentFromS3 } from './readTxt';
+import { parseStructuredFile } from './readCsv';
+import s3 from './s3Client';
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
@@ -205,4 +208,81 @@ Réponse :`;
     }
   }
   return [];
+}
+
+// --- CACHE UTILS ---
+import redis from './redisClient';
+
+export async function getCache(key: string): Promise<any | null> {
+  const data = await redis.get(key);
+  if (!data) return null;
+  try {
+    return JSON.parse(data);
+  } catch {
+    return data;
+  }
+}
+
+export async function setCache(key: string, value: any, ttlSeconds?: number) {
+  const str = typeof value === 'string' ? value : JSON.stringify(value);
+  if (ttlSeconds) {
+    await redis.set(key, str, 'EX', ttlSeconds);
+  } else {
+    await redis.set(key, str);
+  }
+}
+
+// --- MONITORING UTILS ---
+export async function logMetric(key: string, value: number) {
+  // Incrémente un compteur (ex: nombre de requêtes)
+  await redis.incrby(key, value);
+}
+
+export async function logTiming(key: string, durationMs: number) {
+  // Stocke la somme et le nombre pour calculer la moyenne
+  await redis.incrby(`${key}:sum`, durationMs);
+  await redis.incrby(`${key}:count`, 1);
+}
+
+export async function getTimingStats(key: string) {
+  const sum = parseInt(await redis.get(`${key}:sum`) || '0', 10);
+  const count = parseInt(await redis.get(`${key}:count`) || '0', 10);
+  return { avg: count ? sum / count : 0, count, sum };
+}
+
+export async function logCacheHit(endpoint: string) {
+  await redis.incrby(`metrics:${endpoint}:cache_hit`, 1);
+}
+export async function logCacheMiss(endpoint: string) {
+  await redis.incrby(`metrics:${endpoint}:cache_miss`, 1);
+}
+
+// (Suppression de la fonction extractAndAnalyzeDocument, utiliser lib/server/extractAndAnalyzeDocument.ts)
+
+// --- FILE D'ATTENTE PREANALYSE ---
+const PREANALYSIS_QUEUE = 'preanalysis:queue';
+const PREANALYSIS_STATUS = 'preanalysis:status';
+
+export async function enqueuePreanalysisTask(buffer: Buffer, fileName: string, mimeType: string) {
+  // Stocke le buffer temporairement (clé binaire)
+  await redis.set(`preanalysis:buffer:${fileName}`, buffer);
+  await redis.expire(`preanalysis:buffer:${fileName}`, 60 * 60); // 1h TTL
+  await redis.rpush(PREANALYSIS_QUEUE, JSON.stringify({ fileName, mimeType }));
+  await setPreanalysisStatus(fileName, 'pending');
+}
+
+export async function dequeuePreanalysisTask() {
+  const taskStr = await redis.lpop(PREANALYSIS_QUEUE);
+  if (!taskStr) return null;
+  const task = JSON.parse(taskStr);
+  const buffer = await redis.getBuffer(`preanalysis:buffer:${task.fileName}`);
+  return { ...task, buffer };
+}
+
+export async function setPreanalysisStatus(fileName: string, status: 'pending' | 'processing' | 'done' | 'error') {
+  await redis.hset(PREANALYSIS_STATUS, fileName, status);
+}
+
+export async function getPreanalysisStatus(fileName: string) {
+  return await redis.hget(PREANALYSIS_STATUS, fileName) || 'unknown';
 }

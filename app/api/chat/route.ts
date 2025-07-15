@@ -7,7 +7,7 @@ import { NextResponse } from "next/server";
 import { GetObjectCommand, ListObjectsV2Command } from "@aws-sdk/client-s3";
 import s3 from "@/lib/s3Client";
 import redis from '@/lib/redisClient';
-import { getEmbeddingOpenAI } from '@/lib/utils';
+import { getEmbeddingOpenAI, getCache, setCache, logMetric, logTiming, logCacheHit, logCacheMiss } from '@/lib/utils';
 
 type FileReference = { name: string; type: string; key: string; lastReferenced: number };
 type MessageHistory = { role: "user" | "assistant", content: string, embedding?: number[], timestamp?: number };
@@ -17,12 +17,12 @@ type MemoryContext = {
   lastCode?: string;
   lastVariable?: string;
   userGoals?: string[];
-  keyEntities?: { type: string; value: string }[]; 
+  keyEntities?: { type: string; value: string }[];
   recentOutputs?: string[];
   history: MessageHistory[];
   currentFile?: (FileReference & { activeCount?: number });
-  referencedFiles?: FileReference[]; 
-  contextSummary?: string; 
+  referencedFiles?: FileReference[];
+  contextSummary?: string;
   multiFilesActive?: (FileReference & { activeCount?: number })[];
 };
 
@@ -90,8 +90,8 @@ function detectSummaryIntent(message: string) {
 }
 
 const SYSTEM_PROMPT = `
-Vous êtes un assistant IA expert en compréhension et synthèse de documents. 
-Votre objectif est d'aider l'utilisateur à comprendre, résumer ou extraire les points clés d'un document, 
+Vous êtes un assistant IA expert en compréhension et synthèse de documents.
+Votre objectif est d'aider l'utilisateur à comprendre, résumer ou extraire les points clés d'un document,
 en répondant toujours de façon claire, concise et pédagogique, sans jamais restituer le document complet.
 Si l'utilisateur demande un résumé, une explication ou les points clés, fournissez une synthèse structurée et accessible.
 `;
@@ -247,7 +247,66 @@ async function semanticSearchInIndexedFiles(question: string, affaireId: string)
   return scored.sort((a, b) => b.score - a.score).slice(0, 2);
 }
 
+// --- Ajout pour la mise en cache des analyses de documents ---
+async function getOrCacheDocumentAnalysis(bucketName: string, fileKey: string, type: 'pdf' | 'txt' | 'csv') {
+  const cacheKey = `doc:${fileKey}:analysis`;
+  let analysis = await getCache(cacheKey);
+  if (analysis) {
+    console.log(`[CACHE HIT] Analyse document ${fileKey}`);
+    return analysis;
+  }
+  let text = '';
+  if (type === 'pdf') {
+    text = await fetchPdfTextFromS3(bucketName, fileKey);
+  } else if (type === 'txt') {
+    text = await fetchTxtContentFromS3(bucketName, fileKey);
+  } else {
+    // CSV: handled elsewhere
+    return null;
+  }
+  const embedding = await getEmbeddingOpenAI(text.slice(0, 2000));
+  analysis = { text, embedding };
+  await setCache(cacheKey, analysis, 60 * 60 * 24); // 24h TTL
+  return analysis;
+}
+
+// --- Ajout pour la mise en cache des réponses IA ---
+async function getSimilarCachedResponse(userId: string, message: string, threshold = 0.9) {
+  const cacheKey = `user:${userId}:qa-history`;
+  let history = await getCache(cacheKey);
+  if (!history) return null;
+  const userEmbedding = await getEmbeddingOpenAI(message);
+  let bestScore = 0;
+  let bestIdx = -1;
+  for (let i = 0; i < history.length; i++) {
+    const h = history[i];
+    if (h.embedding) {
+      const score = cosineSimilarity(userEmbedding, h.embedding);
+      if (score > bestScore) {
+        bestScore = score;
+        bestIdx = i;
+      }
+    }
+  }
+  if (bestScore > threshold && bestIdx !== -1) {
+    console.log(`[CACHE HIT] Réponse IA similaire trouvée (score: ${bestScore})`);
+    return history[bestIdx].reply;
+  }
+  return null;
+}
+async function cacheUserResponse(userId: string, message: string, embedding: number[], reply: string) {
+  const cacheKey = `user:${userId}:qa-history`;
+  let history = await getCache(cacheKey);
+  if (!Array.isArray(history)) history = [];
+  history.push({ message, embedding, reply, timestamp: Date.now() });
+  // Limiter la taille de l'historique
+  if (history.length > 50) history = history.slice(-50);
+  await setCache(cacheKey, history, 60 * 60 * 24); // 24h TTL
+}
+
 export async function POST(req: Request) {
+  const endpoint = 'api:chat';
+  const start = Date.now();
   try {
     const { message, userId = "default", affaireId, readFiles = true, contextFiles } = await req.json();
     if (isMemoryResetCommand(message)) {
@@ -507,7 +566,7 @@ export async function POST(req: Request) {
       // Explicabilité
       const explicability = {
         files: contextFiles.map(k => k.split('/').pop()),
-        prompt: openaiMessages.map(m => m.content).join('\n---\n'),
+        prompt: openaiMessages.filter(m => m && typeof m.content === 'string').map(m => (m as any).content).join('\n---\n'),
       };
       return NextResponse.json({ reply, suggestions, explicability });
     }
@@ -553,7 +612,7 @@ export async function POST(req: Request) {
         );
         const explicability = {
           files: [],
-          prompt: openaiMessages.map(m => m.content).join('\n---\n'),
+          prompt: openaiMessages.filter(m => m && typeof m.content === 'string').map(m => (m as any).content).join('\n---\n'),
         };
         return NextResponse.json({ reply, suggestions, explicability });
       } else {
@@ -699,9 +758,17 @@ export async function POST(req: Request) {
     }
     memory.history.push({ role: "user", content: message, embedding: userEmbedding, timestamp: Date.now() });
 
-    return NextResponse.json({ 
-      reply, 
-      suggestions, 
+    // Mise en cache de la réponse IA
+    await cacheUserResponse(userId, message, userEmbedding, reply);
+
+    // --- Log du temps de réponse et du nombre de requêtes ---
+    const duration = Date.now() - start;
+    await logTiming(endpoint, duration);
+    await logMetric(`metrics:${endpoint}:requests`, 1);
+
+    return NextResponse.json({
+      reply,
+      suggestions,
       explicability: {
         currentFile: memory.currentFile || null,
         multiFilesActive: memory.multiFilesActive || [],

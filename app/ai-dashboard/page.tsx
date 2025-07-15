@@ -11,6 +11,10 @@ import { Bar, Line, Pie } from "react-chartjs-2"
 import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from "@/components/ui/select"
 import { X, Plus } from "lucide-react"
 import { useSearchParams } from "next/navigation";
+// @ts-ignore
+import jsPDF from "jspdf";
+// @ts-ignore
+import html2canvas from "html2canvas";
 
 ChartJS.register(BarElement, CategoryScale, LinearScale, Tooltip, Legend, PointElement, LineElement, ArcElement)
 
@@ -216,6 +220,20 @@ function WidgetCard({
       return JSON.parse(localStorage.getItem(favKey) || '[]');
     } catch { return []; }
   });
+  const widgetRef = useRef<HTMLDivElement>(null);
+  const handleExportPDF = async () => {
+    if (!widgetRef.current) return;
+    const canvas = await html2canvas(widgetRef.current, { scale: 2 });
+    const imgData = canvas.toDataURL('image/png');
+    const pdf = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'a4' });
+    const pageWidth = pdf.internal.pageSize.getWidth();
+    const pageHeight = pdf.internal.pageSize.getHeight();
+    const imgWidth = pageWidth - 40;
+    const imgHeight = canvas.height * (imgWidth / canvas.width);
+    let y = 20;
+    pdf.addImage(imgData, 'PNG', 20, y, imgWidth, imgHeight);
+    pdf.save(`${label.replace(/\s+/g, '_').toLowerCase()}_widget.pdf`);
+  };
 
   useEffect(() => {
     if (res && !analysisDone) setAnalysisDone(true);
@@ -321,19 +339,20 @@ function WidgetCard({
   }
 
   return (
-    <Card className={`bg-white/90 shadow-md rounded-xl border border-gray-100 transition p-0 flex flex-col min-h-[420px] w-full`}>
-      <CardHeader className="flex flex-row items-center gap-3 pb-1 px-6 pt-6">
-        {icon}
-        <CardTitle className={`text-lg font-bold text-${color}-800`}>{label}
-          {sel.length > 0 && (
-            <span className="ml-2 text-xs font-normal text-gray-500">
-              {sel.length === 1 && docs.find(d => d.key === sel[0])?.name}
-              {sel.length === 2 && docs.filter(d => sel.includes(d.key)).map(d => d.name).join(', ')}
-              {sel.length > 2 && `${docs.filter(d => sel.includes(d.key)).slice(0,2).map(d => d.name).join(', ')} (+${sel.length-2})`}
-            </span>
-          )}
-        </CardTitle>
-        <Button size="icon" variant="ghost" className="ml-auto" onClick={() => onRemove(widget.id)}><X className="h-5 w-5" /></Button>
+    <div ref={widgetRef} className={`mb-8 w-full bg-white border-l-4 border-${color}-500 rounded-xl shadow-lg flex flex-col`}>
+      <CardHeader className="flex flex-row items-center justify-between gap-2 px-6 pt-6 pb-2">
+        <div className="flex items-center gap-3">
+          {icon}
+          <CardTitle className={`text-${color}-900 text-xl font-bold`}>{label}</CardTitle>
+        </div>
+        <div className="flex gap-2">
+          <Button size="sm" variant="outline" onClick={handleExportPDF} title="Exporter tout le widget en PDF">
+            <Download className="h-4 w-4 mr-1" /> PDF
+          </Button>
+          <Button size="sm" variant="ghost" onClick={() => onRemove(widget.id)} title="Supprimer le widget">
+            <X className="h-4 w-4" />
+          </Button>
+        </div>
       </CardHeader>
       <CardContent className="px-6 pb-6 pt-1 flex-1 flex flex-col">
         {!analysisDone && (
@@ -896,7 +915,7 @@ function WidgetCard({
           </div>
         )}
       </CardContent>
-    </Card>
+    </div>
   )
 }
 
@@ -1169,7 +1188,19 @@ export default function AiDashboardPage() {
   }
 
   return (
-    <>
+    <div className="w-full max-w-none py-8 px-2 md:px-8">
+      {affaireParam && (
+        <div className="mb-6 flex justify-start">
+          <a
+            href={`/affaires/${affaireParam}`}
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-sncf-red text-white font-semibold text-base shadow hover:bg-red-700 transition-colors focus:outline-none focus:ring-2 focus:ring-sncf-red focus:ring-offset-2"
+            title={`Retour à l'affaire ${affaireParam}`}
+          >
+            <span className="text-lg">←</span>
+            Affaire {affaireParam}
+          </a>
+        </div>
+      )}
       {/* TopNavBar est déjà inclus par le layout global */}
       <header className="sticky top-0 z-30 bg-white/90 backdrop-blur flex items-center justify-between px-6 py-3 shadow-sm border-b border-gray-100 max-w-5xl mx-auto w-full">
         <div className="flex items-center gap-3">
@@ -1265,6 +1296,6 @@ export default function AiDashboardPage() {
         setDragActive={setDragActive}
         fileInputRef={fileInputRef}
       />
-    </>
+    </div>
   )
 } 

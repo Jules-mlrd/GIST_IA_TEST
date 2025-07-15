@@ -40,15 +40,15 @@ export async function extractTextFromPdf(pdfBuffer: Buffer): Promise<string> {
 }
 
 /**
- * Lists all PDF files in an S3 bucket.
+ * Lists all PDF files in an S3 bucket, optionally under a prefix.
  * @param bucketName - The name of the S3 bucket.
+ * @param prefix - Optional prefix to filter files (e.g. 'affaires/12345/')
  * @returns An array of PDF file keys in the S3 bucket.
  */
-export async function listPdfFilesInS3(bucketName: string): Promise<string[]> {
+export async function listPdfFilesInS3(bucketName: string, prefix?: string): Promise<string[]> {
   try {
-    const command = new ListObjectsV2Command({ Bucket: bucketName });
+    const command = new ListObjectsV2Command({ Bucket: bucketName, Prefix: prefix });
     const data = await s3.send(command);
-
     return (data.Contents || [])
       .filter((item: any) => item.Key && item.Key.endsWith('.pdf'))
       .map((item: any) => item.Key!);

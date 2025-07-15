@@ -28,10 +28,15 @@ export function readTxtContent(): string {
   return allText
 }
 
-// S3-based TXT file listing
-export async function listTxtFilesInS3(bucketName: string): Promise<string[]> {
+/**
+ * Lists all TXT files in an S3 bucket, optionally under a prefix.
+ * @param bucketName - The name of the S3 bucket.
+ * @param prefix - Optional prefix to filter files (e.g. 'affaires/12345/')
+ * @returns An array of TXT file keys in the S3 bucket.
+ */
+export async function listTxtFilesInS3(bucketName: string, prefix?: string): Promise<string[]> {
   try {
-    const command = new ListObjectsV2Command({ Bucket: bucketName });
+    const command = new ListObjectsV2Command({ Bucket: bucketName, Prefix: prefix });
     const data = await s3.send(command);
     return (data.Contents || [])
       .filter((item: any) => item.Key && item.Key.endsWith('.txt'))
@@ -56,5 +61,21 @@ export async function fetchTxtContentFromS3(bucketName: string, fileKey: string)
   } catch (error) {
     console.error('Error fetching TXT from S3:', error);
     throw new Error('Failed to fetch TXT from S3.');
+  }
+}
+
+export async function fetchHtmlTextFromS3(bucketName: string, fileKey: string): Promise<string> {
+  try {
+    const command = new GetObjectCommand({ Bucket: bucketName, Key: fileKey });
+    const data = await s3.send(command);
+    if (!data.Body) throw new Error('S3 object Body is undefined.');
+    const chunks: Buffer[] = [];
+    for await (const chunk of data.Body as any) {
+      chunks.push(Buffer.from(chunk));
+    }
+    return Buffer.concat(chunks).toString('utf-8');
+  } catch (error) {
+    console.error('Error fetching HTML from S3:', error);
+    throw new Error('Failed to fetch HTML from S3.');
   }
 }

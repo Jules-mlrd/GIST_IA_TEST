@@ -179,6 +179,117 @@ function extractDevisData(text: string) {
   return { lines: plausibleLines, totalHT, tva, totalTTC, cleanedText, patternUsed, warning };
 }
 
+/**
+ * Utilise OpenAI pour extraire une timeline structurée d'un texte de projet.
+ * Retourne un tableau d'objets { date, label, description? }.
+ */
+export async function extractTimelineWithLLM(text: string, apiKey?: string): Promise<Array<{ date: string, label: string, description?: string }>> {
+  const prompt = `Voici un texte extrait de documents de projet SNCF :\n\n"""\n${text}\n"""\n\nAnalyse ce texte et extrais une timeline structurée des événements, jalons ou étapes importantes du projet.\nPour chaque événement, donne :\n- date (si connue, sinon "inconnue")\n- label (titre court de l'événement)\n- description (facultatif, phrase explicative)\n\nRetourne uniquement un tableau JSON strictement valide, exemple :\n[\n  { "date": "2024-01-15", "label": "Étude de faisabilité", "description": "Analyse des besoins et validation de la faisabilité." },\n  { "date": "2024-02-28", "label": "Validation technique" }\n]\n\nRéponse :`;
+  const response = await fetch('https://api.openai.com/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${apiKey || process.env.OPENAI_API_KEY}`,
+    },
+    body: JSON.stringify({
+      model: 'gpt-3.5-turbo',
+      messages: [
+        { role: 'system', content: 'Tu es un assistant d\'extraction de timeline projet.' },
+        { role: 'user', content: prompt },
+      ],
+      temperature: 0.2,
+      max_tokens: 800,
+    }),
+  });
+  if (!response.ok) throw new Error('Erreur OpenAI extraction timeline');
+  const data = await response.json();
+  const content = data.choices?.[0]?.message?.content || '';
+  const firstBracket = content.indexOf('[');
+  const lastBracket = content.lastIndexOf(']');
+  if (firstBracket !== -1 && lastBracket !== -1 && lastBracket > firstBracket) {
+    try {
+      return JSON.parse(content.substring(firstBracket, lastBracket + 1));
+    } catch {
+      return [];
+    }
+  }
+  return [];
+}
+
+/**
+ * Utilise OpenAI pour extraire les tâches projet d'un texte.
+ * Retourne un tableau d'objets { id, name, status, assignee, startDate, endDate, description? }.
+ */
+export async function extractTasksWithLLM(text: string, apiKey?: string): Promise<Array<{ id: string, name: string, status: string, assignee?: string, startDate?: string, endDate?: string, description?: string }>> {
+  const prompt = `Voici un texte extrait de documents de projet SNCF :\n\n"""\n${text}\n"""\n\nAnalyse ce texte et extrais la liste structurée des tâches du projet.\nPour chaque tâche, donne :\n- id (identifiant ou numéro, ou "T-XXX" si inconnu)\n- name (titre court de la tâche)\n- status (completed, in-progress, pending)\n- assignee (personne assignée, si connue)\n- startDate (si connue)\n- endDate (si connue)\n- description (facultatif, phrase explicative)\n\nRetourne uniquement un tableau JSON strictement valide, exemple :\n[\n  { "id": "T-001", "name": "Analyse des besoins", "status": "completed", "assignee": "Marie Dubois", "startDate": "2024-01-10", "endDate": "2024-01-15", "description": "Analyse des besoins utilisateurs." },\n  { "id": "T-002", "name": "Développement", "status": "in-progress" }\n]\n\nRéponse :`;
+  const response = await fetch('https://api.openai.com/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${apiKey || process.env.OPENAI_API_KEY}`,
+    },
+    body: JSON.stringify({
+      model: 'gpt-3.5-turbo',
+      messages: [
+        { role: 'system', content: 'Tu es un assistant d\'extraction de tâches projet.' },
+        { role: 'user', content: prompt },
+      ],
+      temperature: 0.2,
+      max_tokens: 1000,
+    }),
+  });
+  if (!response.ok) throw new Error('Erreur OpenAI extraction tâches');
+  const data = await response.json();
+  const content = data.choices?.[0]?.message?.content || '';
+  const firstBracket = content.indexOf('[');
+  const lastBracket = content.lastIndexOf(']');
+  if (firstBracket !== -1 && lastBracket !== -1 && lastBracket > firstBracket) {
+    try {
+      return JSON.parse(content.substring(firstBracket, lastBracket + 1));
+    } catch {
+      return [];
+    }
+  }
+  return [];
+}
+
+/**
+ * Utilise OpenAI pour extraire un diagramme de Gantt simplifié d'un texte projet.
+ * Retourne un tableau d'objets { label, startDate, endDate, status }.
+ */
+export async function extractGanttWithLLM(text: string, apiKey?: string): Promise<Array<{ label: string, startDate?: string, endDate?: string, status?: string }>> {
+  const prompt = `Voici un texte extrait de documents de projet SNCF :\n\n"""\n${text}\n"""\n\nAnalyse ce texte et extrais un diagramme de Gantt simplifié des tâches ou phases du projet.\nPour chaque élément, donne :\n- label (nom de la tâche ou phase)\n- startDate (si connue)\n- endDate (si connue)\n- status (completed, in-progress, pending)\n\nRetourne uniquement un tableau JSON strictement valide, exemple :\n[\n  { "label": "Étude de faisabilité", "startDate": "2024-01-10", "endDate": "2024-01-15", "status": "completed" },\n  { "label": "Développement", "status": "in-progress" }\n]\n\nRéponse :`;
+  const response = await fetch('https://api.openai.com/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${apiKey || process.env.OPENAI_API_KEY}`,
+    },
+    body: JSON.stringify({
+      model: 'gpt-3.5-turbo',
+      messages: [
+        { role: 'system', content: 'Tu es un assistant d\'extraction de Gantt projet.' },
+        { role: 'user', content: prompt },
+      ],
+      temperature: 0.2,
+      max_tokens: 1000,
+    }),
+  });
+  if (!response.ok) throw new Error('Erreur OpenAI extraction Gantt');
+  const data = await response.json();
+  const content = data.choices?.[0]?.message?.content || '';
+  const firstBracket = content.indexOf('[');
+  const lastBracket = content.lastIndexOf(']');
+  if (firstBracket !== -1 && lastBracket !== -1 && lastBracket > firstBracket) {
+    try {
+      return JSON.parse(content.substring(firstBracket, lastBracket + 1));
+    } catch {
+      return [];
+    }
+  }
+  return [];
+}
+
 export async function POST(req: Request) {
   let keys: string[] = []
   try {

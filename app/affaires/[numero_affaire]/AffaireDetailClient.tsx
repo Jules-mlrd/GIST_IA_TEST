@@ -73,16 +73,20 @@ export default function AffaireDetailClient({ affaire }: { affaire: any }) {
           Fichiers
         </button>
         <Link href={`/ai-dashboard?affaire=${affaire.numero_affaire}`}
-          target="_blank"
-          rel="noopener noreferrer"
           className="px-4 py-2 rounded-t-lg font-semibold text-blue-700 hover:bg-blue-50 border-b-2 border-transparent hover:border-blue-600 transition">
           Dashboard IA
         </Link>
+        <Link href={`/contacts?affaire=${affaire.numero_affaire}`}
+          className="px-4 py-2 rounded-t-lg font-semibold text-green-700 hover:bg-green-50 border-b-2 border-transparent hover:border-green-600 transition">
+          Contacts
+        </Link>
         <Link href={`/risks?affaire=${affaire.numero_affaire}`}
-          target="_blank"
-          rel="noopener noreferrer"
           className="px-4 py-2 rounded-t-lg font-semibold text-orange-700 hover:bg-orange-50 border-b-2 border-transparent hover:border-orange-600 transition">
           Risques
+        </Link>
+        <Link href={`/affaires/${affaire.numero_affaire}/timeline`}
+          className="px-4 py-2 rounded-t-lg font-semibold text-purple-700 hover:bg-purple-50 border-b-2 border-transparent hover:border-purple-600 transition">
+          Timeline
         </Link>
       </nav>
       <div className="w-full bg-black px-6 py-4 mb-6">

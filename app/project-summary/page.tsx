@@ -1,7 +1,6 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { Layout } from "@/components/layout"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Progress } from "@/components/ui/progress"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
@@ -125,17 +124,13 @@ export default function ProjectSummaryPage() {
 
   if (loading) {
     return (
-      <Layout title="Résumé du projet" subtitle="Chargement automatique...">
-        <div className="p-8 text-center text-gray-500">Chargement du rapport complet ou de la présentation du projet...</div>
-      </Layout>
+      <div className="p-8 text-center text-gray-500">Chargement du rapport complet ou de la présentation du projet...</div>
     )
   }
 
   if (error) {
     return (
-      <Layout title="Résumé du projet" subtitle="Erreur">
-        <div className="p-8 text-center text-red-500">{error}</div>
-      </Layout>
+      <div className="p-8 text-center text-red-500">{error}</div>
     )
   }
 
@@ -190,7 +185,7 @@ export default function ProjectSummaryPage() {
   }
 
   return (
-    <Layout title="Résumé du projet" subtitle={fileName ? `Fichier analysé : ${fileName}` : undefined}>
+    <>
       <div className="mx-auto max-w-6xl w-full flex flex-col gap-8 py-8 px-2 md:px-0">
         <div className="flex justify-end mb-2">
           <button onClick={handleRefresh} className="px-4 py-2 rounded bg-blue-100 text-blue-800 font-semibold hover:bg-blue-200 transition">Rafraîchir</button>
@@ -343,6 +338,6 @@ export default function ProjectSummaryPage() {
           </details>
         </div>
       </div>
-    </Layout>
+    </>
   )
 }
