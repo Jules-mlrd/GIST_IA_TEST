@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CheckCircle, AlertCircle, Clock, Calendar, ChevronLeft, ChevronRight } from "lucide-react";
-import { useSearchParams } from "next/navigation";
+import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ChartContainer } from "@/components/ui/chart";
@@ -21,9 +21,9 @@ import {
 } from "recharts";
 
 export default function TimelineAffairePage() {
-  const searchParams = useSearchParams();
+  const params = useParams();
   const router = useRouter();
-  const affaire = searchParams?.get("affaire") || "";
+  const affaire = params?.numero_affaire || "";
   const [timeline, setTimeline] = useState<any[]>([]);
   const [tasks, setTasks] = useState<any[]>([]);
   const [gantt, setGantt] = useState<any[]>([]);
@@ -56,6 +56,16 @@ export default function TimelineAffairePage() {
 
   return (
     <div className="max-w-4xl mx-auto py-8 px-2">
+      <div className="mb-6 flex justify-start">
+        <a
+          href={`/affaires/${affaire}`}
+          className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-sncf-red text-white font-semibold text-base shadow hover:bg-red-700 transition-colors focus:outline-none focus:ring-2 focus:ring-sncf-red focus:ring-offset-2"
+          title={`Retour à l'affaire ${affaire}`}
+        >
+          <span className="text-lg">←</span>
+          Affaire {affaire}
+        </a>
+      </div>
       <h1 className="text-2xl font-bold text-purple-800 mb-6 text-center">Timeline de l'affaire {affaire && <span className="text-gray-500 font-normal ml-2">{affaire}</span>}</h1>
       <div className="flex justify-between items-center mb-4">
         <div className="flex items-center gap-2">

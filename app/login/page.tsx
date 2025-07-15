@@ -47,7 +47,7 @@ export default function LoginPage() {
       isFullyImplemented: true,
     };
     localStorage.setItem("gist-selected-project", JSON.stringify(clientProject));
-    window.location.href = "/help-center";
+    window.location.href = "/home-page";
   };
 
   const handleCollaboratorLogin = async (e: React.FormEvent) => {
@@ -62,7 +62,7 @@ export default function LoginPage() {
     localStorage.setItem("gist-authenticated", "true");
     localStorage.setItem("gist-user", collaboratorUsername || "Collaborateur");
     localStorage.setItem("gist-user-type", "collaborator");
-    window.location.href = "/help-center";
+    window.location.href = "/home-page";
   };
 
   return (

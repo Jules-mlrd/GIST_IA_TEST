@@ -62,7 +62,7 @@ export default function TopNavBar() {
           <span className="font-bold text-lg text-gray-800">GIST</span>
           <div className="flex flex-wrap md:flex-nowrap gap-2 md:gap-4 overflow-x-auto">
             {[
-              { label: "Accueil", href: "/help-center" },
+              { label: "Accueil", href: "/home-page" },
               { label: "Demandes", href: "/demandes" },
               { label: "Affaires", href: "/project-selection" },
               { label: "Devis" },
@@ -70,7 +70,7 @@ export default function TopNavBar() {
               { label: "Interventions" },
               { label: "Rechercher" },
               { label: "Suivi des affaires" },
-              { label: "Aide" },
+              { label: "Aide", href: "/home-page/aide" },
             ].map((item) => (
               item.href ? (
                 <Link

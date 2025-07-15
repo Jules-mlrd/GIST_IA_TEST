@@ -1216,7 +1216,7 @@ export default function AiDashboardPage() {
           <Button variant="default" className="flex items-center gap-1 text-sm px-3 py-1.5" onClick={() => setShowUpload(true)}>
             <Plus className="h-4 w-4" /> Téléverser
           </Button>
-          <Button variant="ghost" className="flex items-center gap-1 text-sm px-3 py-1.5" onClick={() => window.open('/help-center', '_blank')}>
+          <Button variant="ghost" className="flex items-center gap-1 text-sm px-3 py-1.5" onClick={() => window.open('/home-page', '_blank')}>
             <HelpCircle className="h-4 w-4" /> Aide
           </Button>
         </div>

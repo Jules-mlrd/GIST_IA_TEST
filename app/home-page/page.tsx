@@ -23,7 +23,7 @@ export default function HomePage() {
             <Link href="/ai-dashboard" className="w-full">
               <Button className="w-full bg-[#E2001A]/90 hover:bg-[#b80015]/90 text-white text-base font-medium py-3 rounded-md shadow">Tableau de bord IA</Button>
             </Link>
-            <Link href="/help-center" className="w-full">
+            <Link href="/home-page" className="w-full">
               <Button className="w-full bg-gray-100 hover:bg-gray-200 text-[#E2001A] text-base font-medium py-3 rounded-md shadow">Aide &amp; Documentation</Button>
             </Link>
           </div>
