@@ -151,13 +151,13 @@ async function extractIntentAndEntities(message: string): Promise<{ intent?: str
       max_tokens: 300,
     }),
   });
-  if (!response.ok) return {};
+  if (!response.ok) return { intent: '', entities: [] };
   const data = await response.json();
   try {
     const json = JSON.parse(data.choices?.[0]?.message?.content || '{}');
     return json;
   } catch {
-    return {};
+    return { intent: '', entities: [] };
   }
 }
 
@@ -343,6 +343,51 @@ export async function POST(req: Request) {
       .map(f => f.Key!) || [];
     let shouldUseCurrentFile = false;
     const intentEntities = await extractIntentAndEntities(message);
+
+    // --- Prompt engineering : injecter les contacts dans le prompt système si affaireId ---
+    let contactContext = '';
+    if (affaireId) {
+      const affaire = await prisma.affaires.findFirst({ where: { numero_affaire: affaireId } });
+      if (affaire) {
+        let contactLines = [];
+        if (affaire.client) contactLines.push(`Client : ${affaire.client}`);
+        if (affaire.porteur) contactLines.push(`Porteur : ${affaire.porteur}`);
+        if (affaire.referent) contactLines.push(`Référent : ${affaire.referent}`);
+        if (affaire.contact_moa_moeg) contactLines.push(`Contact MOA/MOEG : ${affaire.contact_moa_moeg}`);
+        if (affaire.guichet) contactLines.push(`Guichet : ${affaire.guichet}`);
+        if (contactLines.length > 0) {
+          contactContext = `\n\nPour l'affaire en cours, les contacts sont :\n- ${contactLines.join('\n- ')}\n\nSi l'utilisateur pose une question sur qui contacter, à qui s'adresser, ou toute question relative aux contacts, répondez précisément avec ces informations. Sinon, répondez normalement.`;
+        }
+      }
+    }
+
+    // --- Ajout : détection question contact ---
+    const contactKeywords = [
+      'contact', 'qui contacter', 'qui dois-je contacter', 'à qui m\'adresser', 'référent', 'porteur', 'client', 'moa', 'moeg', 'responsable', 'personne à contacter', 'personne de contact', 'point de contact', 'support', 'mail', 'email', 'téléphone', 'coordonnées'
+    ];
+    const isContactIntent = (
+      (intentEntities.intent && /contact|référent|porteur|client|moa|moeg|responsable|support|mail|email|téléphone|coordonnées/i.test(intentEntities.intent)) ||
+      contactKeywords.some(kw => message.toLowerCase().includes(kw))
+    );
+    if (isContactIntent && affaireId) {
+      // Récupérer les infos de l'affaire
+      const affaire = await prisma.affaires.findFirst({ where: { numero_affaire: affaireId } });
+      if (affaire) {
+        let contactMsg = `Pour toute information sur l'affaire, vous pouvez contacter :\n`;
+        if (affaire.client) contactMsg += `- Client : ${affaire.client}\n`;
+        if (affaire.porteur) contactMsg += `- Porteur : ${affaire.porteur}\n`;
+        if (affaire.referent) contactMsg += `- Référent : ${affaire.referent}\n`;
+        if (affaire.contact_moa_moeg) contactMsg += `- Contact MOA/MOEG : ${affaire.contact_moa_moeg}\n`;
+        if (affaire.guichet) contactMsg += `- Guichet : ${affaire.guichet}\n`;
+        if (contactMsg.trim() === `Pour toute information sur l'affaire, vous pouvez contacter :`) {
+          contactMsg = `Aucun contact spécifique n'est renseigné pour cette affaire.`;
+        }
+        memory.history.push({ role: "assistant", content: contactMsg });
+        return NextResponse.json({ reply: contactMsg });
+      } else {
+        return NextResponse.json({ reply: "Aucune information d'affaire trouvée pour fournir un contact." });
+      }
+    }
     if (intentEntities.entities?.some(e => e.type === 'file' || e.type === 'document')) {
       shouldUseCurrentFile = true;
     }
@@ -536,7 +581,7 @@ export async function POST(req: Request) {
       }
       const explicitPrompt = `L’utilisateur a explicitement sélectionné les fichiers suivants pour cette question :\n${contextFiles.map(k => k.split('/').pop()).join(', ')}.\nUtilise uniquement leur contenu pour répondre à la demande.`;
       const openaiMessages = [
-        { role: "system", content: SYSTEM_PROMPT },
+        { role: "system", content: SYSTEM_PROMPT + contactContext },
         ambiguousWarning ? { role: "system", content: ambiguousWarning } : undefined,
         fileErrorWarning ? { role: "system", content: fileErrorWarning } : undefined,
         { role: "system", content: explicitPrompt },
@@ -587,8 +632,8 @@ export async function POST(req: Request) {
           // Construire un texte à résumer à partir des champs principaux
           const baseText = `Titre: ${affaire.titre || ''}\nEtat: ${affaire.etat || ''}\nClient: ${affaire.client || ''}\nPorteur: ${affaire.porteur || ''}\nType de demande: ${affaire.type_demande || ''}\nDescription: ${affaire.description_technique || ''}`;
           const openaiMessages = [
-            { role: "system", content: SYSTEM_PROMPT },
-            { role: "user", content: `Merci de résumer de façon claire et concise les informations principales de l'affaire suivante :\n${baseText}` },
+            { role: "system", content: SYSTEM_PROMPT + contactContext },
+            { role: "user", content: `Rédige un paragraphe synthétique et fluide présentant l'affaire ci-dessous à un lecteur non spécialiste, en intégrant les informations principales (titre, état, client, porteur, type de demande, description technique). N'utilise pas de liste, pas de titre, et privilégie un style naturel.\n\nInformations de l'affaire :\n${baseText}` },
           ];
           const response = await fetch('https://api.openai.com/v1/chat/completions', {
             method: 'POST',
@@ -615,7 +660,7 @@ export async function POST(req: Request) {
       }
       if (semanticContext) {
         const openaiMessages = [
-          { role: "system", content: SYSTEM_PROMPT },
+          { role: "system", content: SYSTEM_PROMPT + contactContext },
           { role: "system", content: "L'utilisateur demande un résumé global des informations disponibles. Ne résume aucun fichier précis, mais synthétise les informations générales pertinentes pour l'affaire ou le contexte." },
           { role: "system", content: `Contexte extrait par recherche sémantique :\n${semanticContext}` },
           ...memory.history.slice(-10)
@@ -658,7 +703,7 @@ export async function POST(req: Request) {
       }
     }
     const openaiMessages = [
-      { role: "system", content: SYSTEM_PROMPT },
+      { role: "system", content: SYSTEM_PROMPT + contactContext },
       contextFilesText ? { role: "system", content: `Contexte extrait des fichiers sélectionnés :\n${contextFilesText}` } : undefined,
       semanticContext ? { role: "system", content: `Contexte extrait par recherche sémantique :\n${semanticContext}` } : undefined,
       memory.contextSummary ? { role: "system", content: `Résumé du contexte : ${memory.contextSummary}` } : undefined,

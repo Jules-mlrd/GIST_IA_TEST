@@ -224,11 +224,9 @@ export async function getCache(key: string): Promise<any | null> {
 }
 
 export async function setCache(key: string, value: any, ttlSeconds?: number) {
-  const str = typeof value === 'string' ? value : JSON.stringify(value);
+  await redis.set(key, typeof value === 'string' ? value : JSON.stringify(value));
   if (ttlSeconds) {
-    await redis.set(key, str, { ex: ttlSeconds });
-  } else {
-    await redis.set(key, str);
+    await redis.expire(key, ttlSeconds);
   }
 }
 
@@ -275,7 +273,9 @@ export async function dequeuePreanalysisTask() {
   const taskStr = await redis.lpop(PREANALYSIS_QUEUE);
   if (!taskStr) return null;
   const task = JSON.parse(taskStr);
-  const buffer = await redis.getBuffer(`preanalysis:buffer:${task.fileName}`);
+  // getBuffer n'existe pas sur ce client Redis, utiliser get et Buffer.from si besoin
+  const val = await redis.get(`preanalysis:buffer:${task.fileName}`);
+  const buffer = val ? Buffer.from(val) : null;
   return { ...task, buffer };
 }
 

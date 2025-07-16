@@ -187,7 +187,7 @@ export function ChatBot({ affaireId, files, loading, affaireName }: Props & { af
   const handleSendMessage = async () => {
     if (!inputValue.trim()) return;
     const userMessage: MessageUser = {
-      id: `user-${Date.now()}`,
+      id: `user-${messages.length}`,
       content: inputValue,
       sender: "user",
       timestamp: new Date(),
@@ -211,7 +211,7 @@ export function ChatBot({ affaireId, files, loading, affaireName }: Props & { af
       if (!response.ok) throw new Error('Erreur API');
       const data = await response.json();
       setMessages(prev => [...prev, {
-        id: `bot-${Date.now()}`,
+        id: `bot-${prev.length+1}`,
         content: typeof data.reply === 'string' ? data.reply : String(data.reply) || 'Pas de réponse reçue',
         sender: "bot",
         timestamp: new Date(),
@@ -220,7 +220,7 @@ export function ChatBot({ affaireId, files, loading, affaireName }: Props & { af
       setExplicability(data.explicability || null);
     } catch (error) {
       setMessages(prev => [...prev, {
-        id: `bot-${Date.now()}`,
+        id: `bot-${prev.length+1}`,
         content: typeof error === 'string' ? error : String(error) || 'Erreur inconnue',
         sender: "bot",
         timestamp: new Date(),

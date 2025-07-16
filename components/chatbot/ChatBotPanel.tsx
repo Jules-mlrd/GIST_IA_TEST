@@ -1,6 +1,11 @@
 import React, { useRef, useEffect, useState } from "react";
 import { X, Loader2, MoreHorizontal, FileText, Paperclip, ArrowUp, FolderOpen, Settings } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+// Ajout : utilitaire markdown -> HTML
+import { marked } from "marked";
+import DOMPurify from 'dompurify';
+// Si erreur d'import côté client, utiliser :
+// import DOMPurify from 'dompurify';
 
 type Message = {
   id: string;
@@ -52,6 +57,33 @@ function sanitizeSummaryHtml(html: string): string {
   return clean;
 }
 
+// Fonction utilitaire pour transformer le markdown simple en HTML propre
+function markdownToCleanHtml(md: string): string {
+  // On retire les titres (lignes commençant par #)
+  md = md.replace(/^#+ .+$/gm, "");
+  // On retire le gras markdown (**) mais garde le texte
+  md = md.replace(/\*\*(.*?)\*\*/g, "$1");
+  // On retire l'italique markdown (*) mais garde le texte
+  md = md.replace(/\*(.*?)\*/g, "$1");
+  // On retire les liens markdown [texte](url) => texte
+  md = md.replace(/\[(.*?)\]\((.*?)\)/g, "$1");
+  // On retire les images ![alt](url)
+  md = md.replace(/!\[.*?\]\(.*?\)/g, "");
+  // On retire les blockquotes
+  md = md.replace(/^> ?/gm, "");
+  // On retire les codes inline/backticks
+  md = md.replace(/`([^`]+)`/g, "$1");
+  // On retire les séparateurs ---
+  md = md.replace(/^---+$/gm, "");
+  // On retire les espaces multiples
+  md = md.replace(/\n{3,}/g, "\n\n");
+  // On convertit le markdown restant (listes, paragraphes) en HTML
+  let html = marked.parse(md) as string;
+  // On purifie le HTML pour éviter tout XSS
+  html = DOMPurify.sanitize(html, { ALLOWED_TAGS: ["ul", "ol", "li", "p", "br", "strong", "em", "span"], ALLOWED_ATTR: [] });
+  return html;
+}
+
 const ChatBotPanel: React.FC<Props & {
   readFiles: boolean;
   onToggleReadFiles: () => void;
@@ -81,9 +113,10 @@ const ChatBotPanel: React.FC<Props & {
   fileButtonLabel = "Joindre des fichiers",
   readFiles,
   onToggleReadFiles,
-  onFileContextClick,
+  contextFiles,
+  onRemoveContextFile,
   suggestions,
-  explicabilityBelow,
+  explicability,
   onShowPromptModal,
   userPrefs,
   onPrefChange,
@@ -216,32 +249,16 @@ const ChatBotPanel: React.FC<Props & {
                     className={`flex w-full ${msg.sender === "user" ? "justify-end" : "justify-start"}`}
                   >
                     {/* Résumé IA encapsulé dans une bulle spéciale */}
-                    {msg.sender === "bot" && typeof msg.content === 'object' && msg.content && (msg.id.startsWith('bot-summary-')) ? (() => {
-                      try {
-                        // Récupère le HTML du résumé
-                        const html = msg.content.props && msg.content.props.dangerouslySetInnerHTML ? msg.content.props.dangerouslySetInnerHTML.__html : '';
-                        const safeHtml = sanitizeSummaryHtml(html);
-                        return (
-                          <div
-                            className="bg-blue-50 border border-blue-200 rounded-xl p-4 text-sm text-blue-900 max-w-[80%] max-h-[40vh] overflow-y-auto shadow scrollbar-thin scrollbar-thumb-sncf-red/60"
-                            style={{ wordBreak: 'break-word', overflowWrap: 'anywhere' }}
-                            dangerouslySetInnerHTML={{ __html: safeHtml }}
-                          />
-                        );
-                      } catch (e) {
-                        return (
-                          <div className="bg-red-50 border border-red-200 rounded-xl p-4 text-sm text-red-800 max-w-[80%]">
-                            Erreur lors de l'affichage du résumé IA.
-                          </div>
-                        );
-                      }
-                    })() : (
+                    {msg.sender === "bot" ? (
+                      <div
+                        className="rounded-2xl px-4 py-2 max-w-[80%] bg-gray-50 text-gray-900 self-start shadow-sm text-sm leading-relaxed chatbot-ia-bubble"
+                        style={{ wordBreak: 'break-word', overflowWrap: 'anywhere', fontFamily: 'Inter, Arial, sans-serif', margin: '0.5rem 0' }}
+                        dangerouslySetInnerHTML={{ __html: markdownToCleanHtml(typeof msg.content === 'string' ? msg.content : String(msg.content)) }}
+                      />
+                    ) : (
                       <div
                         className={`rounded-2xl px-4 py-2 max-w-[80%] break-words overflow-wrap break-word whitespace-pre-line shadow-sm text-sm transition-colors duration-150
-                          ${msg.sender === "user"
-                            ? "bg-sncf-red text-white self-end hover:bg-sncf-red/90"
-                            : "bg-gray-100 text-gray-800 self-start hover:bg-gray-100/80"}
-                        `}
+                          bg-sncf-red text-white self-end hover:bg-sncf-red/90`}
                         style={{ wordBreak: 'break-word', overflowWrap: 'anywhere', cursor: 'pointer' }}
                       >
                         {msg.content}
@@ -259,13 +276,13 @@ const ChatBotPanel: React.FC<Props & {
                             ))}
                           </div>
                         )}
-                        {explicabilityBelow?.files && explicabilityBelow.files.length > 0 && (
+                        {explicability?.files && explicability.files.length > 0 && (
                           <div className="text-xs text-gray-400 mt-1 flex items-center gap-2">
                             <span>Fichiers utilisés :</span>
-                            {explicabilityBelow.files.map((f, i) => (
+                            {explicability.files.map((f: string, i: number) => (
                               <span key={i} className="bg-gray-100 border border-gray-200 rounded px-2 py-0.5 text-gray-700 ml-1">{f}</span>
                             ))}
-                            {explicabilityBelow.prompt && onShowPromptModal && (
+                            {explicability.prompt && onShowPromptModal && (
                               <button className="ml-2 underline text-blue-500 text-xs" onClick={onShowPromptModal} title="Voir le prompt IA">Prompt IA</button>
                             )}
                           </div>
@@ -303,17 +320,6 @@ const ChatBotPanel: React.FC<Props & {
                   title="Joindre un fichier"
                 >
                   <Paperclip className="h-5 w-5 text-sncf-red" />
-                </button>
-              )}
-              {/* Bouton donner fichiers en contexte */}
-              {onFileContextClick && (
-                <button
-                  className="ml-1 p-2 rounded-full hover:bg-gray-100 transition-colors"
-                  onClick={onFileContextClick}
-                  type="button"
-                  title="Donner des fichiers en contexte"
-                >
-                  <FolderOpen className="h-5 w-5 text-blue-500" />
                 </button>
               )}
               {/* Toggle lecture fichiers */}
