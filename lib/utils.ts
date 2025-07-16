@@ -226,7 +226,7 @@ export async function getCache(key: string): Promise<any | null> {
 export async function setCache(key: string, value: any, ttlSeconds?: number) {
   const str = typeof value === 'string' ? value : JSON.stringify(value);
   if (ttlSeconds) {
-    await redis.set(key, str, 'EX', ttlSeconds);
+    await redis.set(key, str, { ex: ttlSeconds });
   } else {
     await redis.set(key, str);
   }

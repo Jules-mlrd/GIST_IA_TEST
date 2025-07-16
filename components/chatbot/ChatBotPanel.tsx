@@ -83,7 +83,7 @@ const ChatBotPanel: React.FC<Props & {
   onToggleReadFiles,
   onFileContextClick,
   suggestions,
-  explicability,
+  explicabilityBelow,
   onShowPromptModal,
   userPrefs,
   onPrefChange,
@@ -259,13 +259,13 @@ const ChatBotPanel: React.FC<Props & {
                             ))}
                           </div>
                         )}
-                        {explicability?.files && explicability.files.length > 0 && (
+                        {explicabilityBelow?.files && explicabilityBelow.files.length > 0 && (
                           <div className="text-xs text-gray-400 mt-1 flex items-center gap-2">
                             <span>Fichiers utilisés :</span>
-                            {explicability.files.map((f, i) => (
+                            {explicabilityBelow.files.map((f, i) => (
                               <span key={i} className="bg-gray-100 border border-gray-200 rounded px-2 py-0.5 text-gray-700 ml-1">{f}</span>
                             ))}
-                            {explicability.prompt && onShowPromptModal && (
+                            {explicabilityBelow.prompt && onShowPromptModal && (
                               <button className="ml-2 underline text-blue-500 text-xs" onClick={onShowPromptModal} title="Voir le prompt IA">Prompt IA</button>
                             )}
                           </div>

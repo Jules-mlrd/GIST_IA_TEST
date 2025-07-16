@@ -8,6 +8,8 @@ import { GetObjectCommand, ListObjectsV2Command } from "@aws-sdk/client-s3";
 import s3 from "@/lib/s3Client";
 import redis from '@/lib/redisClient';
 import { getEmbeddingOpenAI, getCache, setCache, logMetric, logTiming, logCacheHit, logCacheMiss } from '@/lib/utils';
+import { PrismaClient } from '@/lib/generated/prisma';
+const prisma = new PrismaClient();
 
 type FileReference = { name: string; type: string; key: string; lastReferenced: number };
 type MessageHistory = { role: "user" | "assistant", content: string, embedding?: number[], timestamp?: number };
@@ -29,7 +31,16 @@ type MemoryContext = {
 
 async function getMemory(userId: string): Promise<MemoryContext> {
   const data = await redis.get(`memory:${userId}`);
-  if (data) return JSON.parse(data);
+  if (data) {
+    try {
+      return JSON.parse(data);
+    } catch {
+      // Valeur corrompue : on reset la mémoire
+      const initial: MemoryContext = { history: [], referencedFiles: [] };
+      await redis.set(`memory:${userId}`, JSON.stringify(initial));
+      return initial;
+    }
+  }
   const initial: MemoryContext = { history: [], referencedFiles: [] };
   await redis.set(`memory:${userId}`, JSON.stringify(initial));
   return initial;
@@ -557,22 +568,51 @@ export async function POST(req: Request) {
       const data = await response.json();
       const reply = data.choices?.[0]?.message?.content || "Aucune réponse générée.";
       memory.history.push({ role: "assistant", content: reply });
-      // Suggestions proactives
-      const suggestions = await generateSuggestions(
-        `Fichiers utilisés : ${contextFiles.map(k => k.split('/').pop()).join(', ')}\nQuestion : ${message}`,
-        reply,
-        message
-      );
-      // Explicabilité
+      // Supprimer les suggestions dans tous les NextResponse.json
+      // 1. Chercher tous les appels à generateSuggestions et les supprimer
+      // 2. Ne pas inclure suggestions dans les objets retournés
       const explicability = {
         files: contextFiles.map(k => k.split('/').pop()),
         prompt: openaiMessages.filter(m => m && typeof m.content === 'string').map(m => (m as any).content).join('\n---\n'),
       };
-      return NextResponse.json({ reply, suggestions, explicability });
+      return NextResponse.json({ reply, explicabilityBelow: explicability });
     }
     // Après la gestion des fichiers sélectionnés et avant la construction du prompt openaiMessages :
     if (isResumeIntent && (!Array.isArray(contextFiles) || contextFiles.length === 0)) {
       // Résumé global si semanticContext existe, sinon demande de précision
+      if (affaireId) {
+        // Lire l'affaire depuis la base
+        const affaire = await prisma.affaires.findFirst({ where: { numero_affaire: affaireId } });
+        if (affaire) {
+          // Construire un texte à résumer à partir des champs principaux
+          const baseText = `Titre: ${affaire.titre || ''}\nEtat: ${affaire.etat || ''}\nClient: ${affaire.client || ''}\nPorteur: ${affaire.porteur || ''}\nType de demande: ${affaire.type_demande || ''}\nDescription: ${affaire.description_technique || ''}`;
+          const openaiMessages = [
+            { role: "system", content: SYSTEM_PROMPT },
+            { role: "user", content: `Merci de résumer de façon claire et concise les informations principales de l'affaire suivante :\n${baseText}` },
+          ];
+          const response = await fetch('https://api.openai.com/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
+            },
+            body: JSON.stringify({
+              model: 'gpt-3.5-turbo',
+              messages: openaiMessages,
+              temperature: 0.7,
+              max_tokens: 500,
+            }),
+          });
+          if (!response.ok) {
+            console.error('OpenAI API error:', await response.text());
+            return NextResponse.json({ reply: 'Erreur OpenAI.' }, { status: 500 });
+          }
+          const data = await response.json();
+          const reply = data.choices?.[0]?.message?.content || "Aucune réponse générée.";
+          memory.history.push({ role: "assistant", content: reply });
+          return NextResponse.json({ reply });
+        }
+      }
       if (semanticContext) {
         const openaiMessages = [
           { role: "system", content: SYSTEM_PROMPT },
@@ -605,16 +645,14 @@ export async function POST(req: Request) {
         const data = await response.json();
         const reply = data.choices?.[0]?.message?.content || "Aucune réponse générée.";
         memory.history.push({ role: "assistant", content: reply });
-        const suggestions = await generateSuggestions(
-          `Résumé global demandé.\nQuestion : ${message}`,
-          reply,
-          message
-        );
+        // Supprimer les suggestions dans tous les NextResponse.json
+        // 1. Chercher tous les appels à generateSuggestions et les supprimer
+        // 2. Ne pas inclure suggestions dans les objets retournés
         const explicability = {
           files: [],
           prompt: openaiMessages.filter(m => m && typeof m.content === 'string').map(m => (m as any).content).join('\n---\n'),
         };
-        return NextResponse.json({ reply, suggestions, explicability });
+        return NextResponse.json({ reply, explicabilityBelow: explicability });
       } else {
         return NextResponse.json({ reply: "Pour quel(s) fichier(s) souhaitez-vous un résumé ? Veuillez sélectionner un ou plusieurs fichiers ou préciser votre demande." });
       }
@@ -723,8 +761,9 @@ export async function POST(req: Request) {
     if (memory.contextSummary) contextForSuggestions += `Résumé du contexte : ${memory.contextSummary}\n`;
     if (memory.userGoals && memory.userGoals.length) contextForSuggestions += `Objectifs utilisateur : ${memory.userGoals.join(", ")}\n`;
     if (memory.keyEntities && memory.keyEntities.length) contextForSuggestions += `Entités clés : ${memory.keyEntities.map(e => `${e.type}: ${e.value}`).join("; ")}\n`;
-    const suggestions = await generateSuggestions(contextForSuggestions, reply, message);
-
+    // Supprimer les suggestions dans tous les NextResponse.json
+    // 1. Chercher tous les appels à generateSuggestions et les supprimer
+    // 2. Ne pas inclure suggestions dans les objets retournés
     const userEmbedding = await getEmbeddingOpenAI(message);
     let similarPast = null;
     if (memory.history && memory.history.length > 0) {
@@ -768,8 +807,7 @@ export async function POST(req: Request) {
 
     return NextResponse.json({
       reply,
-      suggestions,
-      explicability: {
+      explicabilityBelow: {
         currentFile: memory.currentFile || null,
         multiFilesActive: memory.multiFilesActive || [],
         keyEntities: memory.keyEntities || [],

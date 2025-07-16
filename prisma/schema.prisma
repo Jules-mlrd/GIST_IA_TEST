@@ -1,0 +1,82 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../lib/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model notes_travaux {
+  id            Int      @id @default(autoincrement())
+  note          String?
+  affaire_id    Int?
+  libelle       String?
+  date_creation DateTime? @db.Date
+  etat          String?
+
+  affaires      affaires? @relation(fields: [affaire_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+model affaires {
+  id                     Int       @id @default(autoincrement())
+  numero_affaire         String?
+  titre                  String?
+  etat                   String?
+  referent               String?
+  porteur                String?
+  type_demande           String?
+  portefeuille_projet    String?
+  priorite               String?
+  date_demande_client    DateTime? @db.Date
+  date_rea_souhaitee     DateTime? @db.Date
+  compte_projet          String?
+  reference_client       String?
+  s3_folder              String?
+  client                 String?
+  guichet                String?
+  contact_moa_moeg       String?
+  communication_client   String?
+  code_c6                String?
+  fem_esti               String?
+  sa                     String?
+  type_mission           String?
+  type_decret            String?
+  contact_site           String?
+  risque_environnemental String?
+  mesure_env             String?
+  commentaires_env       String?
+  site                   String?
+  description_technique  String?
+  demande                demande[]
+  devis                  devis[]
+  notes_travaux          notes_travaux[]
+}
+
+model demande {
+  id             Int       @id @default(autoincrement())
+  numero_demande String?
+  demandeur      String?
+  etat           String?
+  compte_projet  String?
+  titre          String?
+  date_demande   DateTime? @db.Date
+  statut         String?
+  affaire_id     Int?
+  affaires       affaires? @relation(fields: [affaire_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  devis          devis[]
+}
+
+model devis {
+  id                  Int       @id @default(autoincrement())
+  numero_devis        String?
+  affaire_id          Int?
+  demande_id          Int?
+  objet               String?
+  table_etablissement String?
+  etat                String?
+
+  affaires            affaires? @relation(fields: [affaire_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  demande             demande?  @relation(fields: [demande_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}

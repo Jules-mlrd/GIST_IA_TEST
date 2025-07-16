@@ -2,7 +2,7 @@
 import { useAffaireChatbot } from '@/hooks/useAffaireChatbot';
 import { ChatBot } from '@/components/chatbot';
 import AffaireFilesClient from './AffaireFilesClient';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { X } from 'lucide-react';
 import Link from "next/link";
 
@@ -57,6 +57,72 @@ const FIELD_ORDER = [
 export default function AffaireDetailClient({ affaire }: { affaire: any }) {
   const { files, loading } = useAffaireChatbot(affaire.numero_affaire);
   const [showFiles, setShowFiles] = useState(false);
+  // Ajout pour demandes
+  const [demandes, setDemandes] = useState<any[]>([]);
+  const [loadingDemandes, setLoadingDemandes] = useState(true);
+  const [errorDemandes, setErrorDemandes] = useState<string | null>(null);
+  // Ajout pour devis
+  const [devis, setDevis] = useState<any | null>(null);
+  const [loadingDevis, setLoadingDevis] = useState(true);
+  const [errorDevis, setErrorDevis] = useState<string | null>(null);
+  // Ajout pour notes travaux
+  const [notesTravaux, setNotesTravaux] = useState<any[]>([]);
+  const [loadingNotesTravaux, setLoadingNotesTravaux] = useState(true);
+  const [errorNotesTravaux, setErrorNotesTravaux] = useState<string | null>(null);
+
+  useEffect(() => {
+    async function fetchDemandes() {
+      setLoadingDemandes(true);
+      setErrorDemandes(null);
+      try {
+        const res = await fetch(`/api/api_database/affaires/${affaire.numero_affaire}/demandes`);
+        const data = await res.json();
+        if (data.success) setDemandes(data.demandes || []);
+        else setErrorDemandes(data.error || 'Erreur lors du chargement des demandes');
+      } catch (e: any) {
+        setErrorDemandes(e?.message || 'Erreur lors du chargement des demandes');
+      } finally {
+        setLoadingDemandes(false);
+      }
+    }
+    if (affaire.numero_affaire) fetchDemandes();
+  }, [affaire.numero_affaire]);
+
+  useEffect(() => {
+    async function fetchDevis() {
+      setLoadingDevis(true);
+      setErrorDevis(null);
+      try {
+        const res = await fetch(`/api/api_database/affaires/${affaire.numero_affaire}/devis`);
+        const data = await res.json();
+        if (data.success) setDevis(data.devis);
+        else setErrorDevis(data.error || 'Erreur lors du chargement du devis');
+      } catch (e: any) {
+        setErrorDevis(e?.message || 'Erreur lors du chargement du devis');
+      } finally {
+        setLoadingDevis(false);
+      }
+    }
+    if (affaire.numero_affaire) fetchDevis();
+  }, [affaire.numero_affaire]);
+
+  useEffect(() => {
+    async function fetchNotesTravaux() {
+      setLoadingNotesTravaux(true);
+      setErrorNotesTravaux(null);
+      try {
+        const res = await fetch(`/api/api_database/affaires/${affaire.numero_affaire}/notes-travaux`);
+        const data = await res.json();
+        if (data.success) setNotesTravaux(data.notes || []);
+        else setErrorNotesTravaux(data.error || 'Erreur lors du chargement des notes travaux');
+      } catch (e: any) {
+        setErrorNotesTravaux(e?.message || 'Erreur lors du chargement des notes travaux');
+      } finally {
+        setLoadingNotesTravaux(false);
+      }
+    }
+    if (affaire.numero_affaire) fetchNotesTravaux();
+  }, [affaire.numero_affaire]);
 
   return (
     <div className="relative py-8 px-2">
@@ -182,7 +248,42 @@ export default function AffaireDetailClient({ affaire }: { affaire: any }) {
           <h2 className="text-lg font-bold text-white">Demande client</h2>
         </div>
         <div className="bg-white border rounded-b-lg shadow p-8 mb-8">
-          {/* Contenu à venir */}
+          {loadingDemandes ? (
+            <div>Chargement des demandes...</div>
+          ) : errorDemandes ? (
+            <div className="text-red-600">{errorDemandes}</div>
+          ) : demandes.length === 0 ? (
+            <div className="text-gray-500">Aucune demande trouvée pour cette affaire.</div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="min-w-full border text-sm">
+                <thead>
+                  <tr className="bg-orange-100">
+                    <th className="px-3 py-2 border">Numéro</th>
+                    <th className="px-3 py-2 border">Demandeur</th>
+                    <th className="px-3 py-2 border">État</th>
+                    <th className="px-3 py-2 border">Compte projet</th>
+                    <th className="px-3 py-2 border">Titre</th>
+                    <th className="px-3 py-2 border">Date de demande</th>
+                    <th className="px-3 py-2 border">Statut</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {demandes.map((d) => (
+                    <tr key={d.id} className="border-b last:border-b-0">
+                      <td className="px-3 py-2 border">{d.numero_demande || '-'}</td>
+                      <td className="px-3 py-2 border">{d.demandeur || '-'}</td>
+                      <td className="px-3 py-2 border">{d.etat || '-'}</td>
+                      <td className="px-3 py-2 border">{d.compte_projet || '-'}</td>
+                      <td className="px-3 py-2 border">{d.titre || '-'}</td>
+                      <td className="px-3 py-2 border">{d.date_demande ? new Date(d.date_demande).toLocaleDateString() : '-'}</td>
+                      <td className="px-3 py-2 border">{d.statut || '-'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       </div>
       {/* Bloc Devis */}
@@ -191,7 +292,38 @@ export default function AffaireDetailClient({ affaire }: { affaire: any }) {
           <h2 className="text-lg font-bold text-white">Devis</h2>
         </div>
         <div className="bg-white border rounded-b-lg shadow p-8 mb-8">
-          {/* Contenu à venir */}
+          {loadingDevis ? (
+            <div>Chargement du devis...</div>
+          ) : errorDevis ? (
+            <div className="text-red-600">{errorDevis}</div>
+          ) : !devis ? (
+            <div className="text-gray-500">Aucun devis trouvé pour cette affaire (id=1).</div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="min-w-full border text-sm">
+                <thead>
+                  <tr className="bg-gray-100">
+                    <th className="px-3 py-2 border">Numéro devis</th>
+                    <th className="px-3 py-2 border">Affaire ID</th>
+                    <th className="px-3 py-2 border">Demande ID</th>
+                    <th className="px-3 py-2 border">Objet</th>
+                    <th className="px-3 py-2 border">Table établissement</th>
+                    <th className="px-3 py-2 border">État</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td className="px-3 py-2 border">{devis.numero_devis || '-'}</td>
+                    <td className="px-3 py-2 border">{devis.affaire_id || '-'}</td>
+                    <td className="px-3 py-2 border">{devis.demande_id || '-'}</td>
+                    <td className="px-3 py-2 border">{devis.objet || '-'}</td>
+                    <td className="px-3 py-2 border">{devis.table_etablissement || '-'}</td>
+                    <td className="px-3 py-2 border">{devis.etat || '-'}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       </div>
       {/* Bloc Notes Travaux */}
@@ -200,7 +332,38 @@ export default function AffaireDetailClient({ affaire }: { affaire: any }) {
           <h2 className="text-lg font-bold text-white">Notes Travaux</h2>
         </div>
         <div className="bg-white border rounded-b-lg shadow p-8 mb-8">
-          {/* Contenu à venir */}
+          {loadingNotesTravaux ? (
+            <div>Chargement des notes travaux...</div>
+          ) : errorNotesTravaux ? (
+            <div className="text-red-600">{errorNotesTravaux}</div>
+          ) : notesTravaux.length === 0 ? (
+            <div className="text-gray-500">Aucune note travaux trouvée pour cette affaire.</div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="min-w-full border text-sm">
+                <thead>
+                  <tr className="bg-blue-100">
+                    <th className="px-3 py-2 border">Note</th>
+                    <th className="px-3 py-2 border">Numéro d'affaire</th>
+                    <th className="px-3 py-2 border">Libellé</th>
+                    <th className="px-3 py-2 border">Date de création</th>
+                    <th className="px-3 py-2 border">État</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {notesTravaux.map((n) => (
+                    <tr key={n.id} className="border-b last:border-b-0">
+                      <td className="px-3 py-2 border">{n.note || '-'}</td>
+                      <td className="px-3 py-2 border">{n.affaire_id || '-'}</td>
+                      <td className="px-3 py-2 border">{n.libelle || '-'}</td>
+                      <td className="px-3 py-2 border">{n.date_creation ? new Date(n.date_creation).toLocaleDateString() : '-'}</td>
+                      <td className="px-3 py-2 border">{n.etat || '-'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       </div>
       {/* Bloc Commentaires */}
