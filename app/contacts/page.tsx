@@ -16,6 +16,24 @@ function getFullName(contact: any) {
   return contact.name || "Nom inconnu"
 }
 
+// Fonction utilitaire pour formater les numéros de téléphone français
+function formatPhoneNumber(phone: string): string {
+  if (!phone) return '';
+  // Nettoyage : on enlève tout sauf les chiffres
+  let cleaned = phone.replace(/[^\d+]/g, '');
+  // Format international +33...
+  if (cleaned.startsWith('33')) cleaned = '+' + cleaned;
+  if (cleaned.startsWith('0033')) cleaned = '+33' + cleaned.slice(4);
+  if (cleaned.startsWith('0')) cleaned = cleaned.slice(1);
+  if (cleaned.startsWith('+33')) {
+    // +33 X XX XX XX XX
+    return cleaned.replace(/^\+33(\d)(\d{2})(\d{2})(\d{2})(\d{2})$/, '+33 $1 $2 $3 $4 $5');
+  }
+  // Format national 0X XX XX XX XX
+  if (cleaned.length === 9) cleaned = '0' + cleaned;
+  return cleaned.replace(/^(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})$/, '$1 $2 $3 $4 $5');
+}
+
 export default function ContactsPage() {
   const [contacts, setContacts] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
@@ -131,10 +149,10 @@ export default function ContactsPage() {
                       </div>
                     )}
                     {contact.telephone && (
-                      <div className="flex items-center text-base truncate" title={contact.telephone}>
+                      <div className="flex items-center text-base truncate" title={formatPhoneNumber(contact.telephone)}>
                         <Phone className="h-4 w-4 mr-2 text-gray-500" />
                         <a href={`tel:${contact.telephone}`} className="text-gray-700 hover:text-sncf-red truncate" style={{maxWidth:'200px', display:'inline-block', verticalAlign:'bottom', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap'}}>
-                          {contact.telephone}
+                          {formatPhoneNumber(contact.telephone)}
                         </a>
                       </div>
                     )}

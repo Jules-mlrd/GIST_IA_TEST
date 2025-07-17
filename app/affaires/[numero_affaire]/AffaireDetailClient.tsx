@@ -57,15 +57,12 @@ const FIELD_ORDER = [
 export default function AffaireDetailClient({ affaire }: { affaire: any }) {
   const { files, loading } = useAffaireChatbot(affaire.numero_affaire);
   const [showFiles, setShowFiles] = useState(false);
-  // Ajout pour demandes
   const [demandes, setDemandes] = useState<any[]>([]);
   const [loadingDemandes, setLoadingDemandes] = useState(true);
   const [errorDemandes, setErrorDemandes] = useState<string | null>(null);
-  // Ajout pour devis
   const [devis, setDevis] = useState<any | null>(null);
   const [loadingDevis, setLoadingDevis] = useState(true);
   const [errorDevis, setErrorDevis] = useState<string | null>(null);
-  // Ajout pour notes travaux
   const [notesTravaux, setNotesTravaux] = useState<any[]>([]);
   const [loadingNotesTravaux, setLoadingNotesTravaux] = useState(true);
   const [errorNotesTravaux, setErrorNotesTravaux] = useState<string | null>(null);
@@ -125,8 +122,7 @@ export default function AffaireDetailClient({ affaire }: { affaire: any }) {
   }, [affaire.numero_affaire]);
 
   return (
-    <div className="relative py-8 px-2">
-      {/* Onglets de navigation affaire */}
+    <div className="relative py-8 px-2 text-base">
       <nav className="flex gap-2 mb-8 border-b pb-2">
         <Link href={`/affaires/${affaire.numero_affaire}`}
           className="px-4 py-2 rounded-t-lg font-semibold text-gray-700 hover:bg-gray-100 border-b-2 border-transparent hover:border-blue-400 transition">
@@ -161,12 +157,11 @@ export default function AffaireDetailClient({ affaire }: { affaire: any }) {
         </h1>
       </div>
       <div className="flex flex-col md:flex-row w-full max-w-full mx-auto gap-4">
-        {/* Bloc infos à gauche */}
         <div className="w-full md:w-1/2">
           <div className="bg-green-600 rounded-t-lg px-6 py-5">
             <h2 className="text-lg font-bold text-white">Informations générales</h2>
           </div>
-          <div className="bg-white border rounded-b-lg shadow p-8 mb-8">
+          <div className="bg-white border rounded-b-lg shadow p-8 mb-8 text-base">
             <table className="w-full text-left border-collapse">
               <tbody>
                 {FIELD_ORDER.map((key) => (
@@ -191,7 +186,6 @@ export default function AffaireDetailClient({ affaire }: { affaire: any }) {
             </table>
           </div>
         </div>
-        {/* Bloc fichiers à droite */}
         <div className="w-full md:w-1/2">
           <div className="bg-violet-600 rounded-t-lg px-6 py-5 flex items-center justify-between">
             <h2 className="text-lg font-bold text-white">Fichiers</h2>
@@ -205,49 +199,32 @@ export default function AffaireDetailClient({ affaire }: { affaire: any }) {
               </button>
             )}
           </div>
-          <div className="bg-white border rounded-b-lg shadow p-8 mb-8">
-            <div className="flex items-center justify-between mb-4">
-              <div className="font-semibold text-gray-700 text-lg">Fichiers de l'affaire</div>
-              {showFiles && (
-                <button
-                  className="ml-2 p-1 rounded hover:bg-violet-100 text-violet-700"
-                  aria-label="Fermer les fichiers"
-                  onClick={() => setShowFiles(false)}
-                >
-                  <X className="h-5 w-5" />
-                </button>
-              )}
-            </div>
-            <div className="mb-4">
-              <div className="font-semibold text-gray-700 mb-1">URL</div>
-              {affaire.s3_folder ? (
-                <a href={affaire.s3_folder} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline break-all">{affaire.s3_folder}</a>
-              ) : (
-                <span className="text-gray-400">Non renseigné</span>
-              )}
-            </div>
-            <button
-              className="bg-violet-600 hover:bg-violet-700 text-white font-semibold px-4 py-2 rounded shadow mb-4"
-              onClick={() => setShowFiles(v => !v)}
-            >
-              {showFiles ? 'Masquer les fichiers' : 'Afficher les fichiers'}
-            </button>
-            {showFiles && (
-              <div className="mt-4">
-                <AffaireFilesClient numero_affaire={affaire.numero_affaire} />
-              </div>
+          {/* Bloc Fichiers sans bouton Note Travaux */}
+          <div className="bg-white border rounded-b-lg shadow p-8 mb-8 text-base flex flex-col gap-4">
+            {/* Lien vers le dossier S3 de l'affaire */}
+            {affaire.s3_folder && (
+              <a href={affaire.s3_folder} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline break-all mb-2">
+                Accéder au dossier S3 de l'affaire
+              </a>
             )}
+            {/* Bouton afficher/masquer la liste des fichiers */}
+            <button
+              onClick={() => setShowFiles(v => !v)}
+              className="self-start px-3 py-1 text-sm rounded bg-violet-600 text-white hover:bg-violet-700 mb-2"
+            >
+              {showFiles ? 'Masquer la liste des fichiers' : 'Afficher la liste des fichiers'}
+            </button>
+            {/* Liste des fichiers, masquée par défaut */}
+            {showFiles && <AffaireFilesClient numero_affaire={affaire.numero_affaire} />}
           </div>
-          {/* ChatBot flottant classique */}
           <ChatBot affaireId={affaire.numero_affaire} files={files} loading={loading} />
         </div>
       </div>
-      {/* Bloc Demande client */}
       <div className="w-full max-w-full mx-auto mt-4">
         <div className="bg-orange-500 rounded-t-lg px-6 py-5">
           <h2 className="text-lg font-bold text-white">Demande client</h2>
         </div>
-        <div className="bg-white border rounded-b-lg shadow p-8 mb-8">
+        <div className="bg-white border rounded-b-lg shadow p-8 mb-8 text-base">
           {loadingDemandes ? (
             <div>Chargement des demandes...</div>
           ) : errorDemandes ? (
@@ -286,12 +263,11 @@ export default function AffaireDetailClient({ affaire }: { affaire: any }) {
           )}
         </div>
       </div>
-      {/* Bloc Devis */}
       <div className="w-full max-w-full mx-auto mt-4">
         <div className="bg-gray-800 rounded-t-lg px-6 py-5">
           <h2 className="text-lg font-bold text-white">Devis</h2>
         </div>
-        <div className="bg-white border rounded-b-lg shadow p-8 mb-8">
+        <div className="bg-white border rounded-b-lg shadow p-8 mb-8 text-base">
           {loadingDevis ? (
             <div>Chargement du devis...</div>
           ) : errorDevis ? (
@@ -326,12 +302,14 @@ export default function AffaireDetailClient({ affaire }: { affaire: any }) {
           )}
         </div>
       </div>
-      {/* Bloc Notes Travaux */}
       <div className="w-full max-w-full mx-auto mt-4">
-        <div className="bg-blue-900 rounded-t-lg px-6 py-5">
+        <div className="bg-blue-900 rounded-t-lg px-6 py-5 flex items-center justify-between">
           <h2 className="text-lg font-bold text-white">Notes Travaux</h2>
+          <Link href={`/affaires/${affaire.numero_affaire}/notes-travaux`} className="text-xs text-blue-200 hover:text-white underline ml-2">
+            Voir la page Note Travaux
+          </Link>
         </div>
-        <div className="bg-white border rounded-b-lg shadow p-8 mb-8">
+        <div className="bg-white border rounded-b-lg shadow p-8 mb-8 text-base">
           {loadingNotesTravaux ? (
             <div>Chargement des notes travaux...</div>
           ) : errorNotesTravaux ? (
@@ -366,22 +344,18 @@ export default function AffaireDetailClient({ affaire }: { affaire: any }) {
           )}
         </div>
       </div>
-      {/* Bloc Commentaires */}
       <div className="w-full max-w-full mx-auto mt-4">
         <div className="bg-red-600 rounded-t-lg px-6 py-5">
           <h2 className="text-lg font-bold text-white">Commentaires</h2>
         </div>
-        <div className="bg-white border rounded-b-lg shadow p-8 mb-8">
-          {/* Contenu à venir */}
+        <div className="bg-white border rounded-b-lg shadow p-8 mb-8 text-base">
         </div>
       </div>
-      {/* Bloc Historique des modifications */}
       <div className="w-full max-w-full mx-auto mt-4">
         <div className="bg-gray-800 rounded-t-lg px-6 py-5">
           <h2 className="text-lg font-bold text-white">Historique des modifications</h2>
         </div>
-        <div className="bg-white border rounded-b-lg shadow p-8 mb-8">
-          {/* Contenu à venir */}
+        <div className="bg-white border rounded-b-lg shadow p-8 mb-8 text-base">
         </div>
       </div>
     </div>

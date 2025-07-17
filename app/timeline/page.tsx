@@ -5,124 +5,49 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { CheckCircle, AlertCircle, Clock, Calendar, ChevronLeft, ChevronRight } from "lucide-react"
+import { useEffect, useState } from "react";
 
-const milestones = [
-  {
-    name: "Étude de faisabilité",
-    status: "completed",
-    date: "15 Jan 2024",
-    description: "Analyse des besoins et validation de la faisabilité technique et financière du projet.",
-  },
-  {
-    name: "Validation technique",
-    status: "completed",
-    date: "28 Feb 2024",
-    description: "Approbation des spécifications techniques par les équipes d'ingénierie et de sécurité.",
-  },
-  {
-    name: "Phase de développement",
-    status: "in-progress",
-    date: "15 Mar 2024",
-    description: "Développement des composants principaux et intégration des systèmes.",
-  },
-  {
-    name: "Tests et validation",
-    status: "pending",
-    date: "30 Apr 2024",
-    description: "Tests fonctionnels, tests de performance et validation des exigences.",
-  },
-  {
-    name: "Mise en production",
-    status: "pending",
-    date: "15 Jun 2024",
-    description: "Déploiement en production et formation des utilisateurs finaux.",
-  },
-]
-
-const tasks = [
-  {
-    id: "T-001",
-    name: "Analyse des besoins utilisateurs",
-    status: "completed",
-    assignee: "Marie Dubois",
-    startDate: "10 Jan 2024",
-    endDate: "15 Jan 2024",
-  },
-  {
-    id: "T-002",
-    name: "Rédaction des spécifications",
-    status: "completed",
-    assignee: "Jean Martin",
-    startDate: "16 Jan 2024",
-    endDate: "31 Jan 2024",
-  },
-  {
-    id: "T-003",
-    name: "Validation architecture",
-    status: "completed",
-    assignee: "Thomas Petit",
-    startDate: "01 Feb 2024",
-    endDate: "15 Feb 2024",
-  },
-  {
-    id: "T-004",
-    name: "Développement backend",
-    status: "in-progress",
-    assignee: "Jean Martin",
-    startDate: "16 Feb 2024",
-    endDate: "15 Mar 2024",
-  },
-  {
-    id: "T-005",
-    name: "Développement frontend",
-    status: "in-progress",
-    assignee: "Claire Moreau",
-    startDate: "01 Mar 2024",
-    endDate: "31 Mar 2024",
-  },
-  {
-    id: "T-006",
-    name: "Tests d'intégration",
-    status: "pending",
-    assignee: "Thomas Petit",
-    startDate: "01 Apr 2024",
-    endDate: "15 Apr 2024",
-  },
-  {
-    id: "T-007",
-    name: "Tests utilisateurs",
-    status: "pending",
-    assignee: "Marie Dubois",
-    startDate: "16 Apr 2024",
-    endDate: "30 Apr 2024",
-  },
-  {
-    id: "T-008",
-    name: "Préparation déploiement",
-    status: "pending",
-    assignee: "Jean Martin",
-    startDate: "01 May 2024",
-    endDate: "31 May 2024",
-  },
-  {
-    id: "T-009",
-    name: "Formation utilisateurs",
-    status: "pending",
-    assignee: "Claire Moreau",
-    startDate: "01 Jun 2024",
-    endDate: "14 Jun 2024",
-  },
-  {
-    id: "T-010",
-    name: "Mise en production",
-    status: "pending",
-    assignee: "Marie Dubois",
-    startDate: "15 Jun 2024",
-    endDate: "15 Jun 2024",
-  },
-]
 
 export default function TimelinePage() {
+  type Milestone = {
+    name: string;
+    description: string;
+    date: string;
+    status: 'completed' | 'in-progress' | 'pending';
+  };
+  type Task = {
+    id: string;
+    name: string;
+    assignee: string;
+    startDate: string;
+    endDate: string;
+    status: 'completed' | 'in-progress' | 'pending';
+  };
+
+  const [milestones, setMilestones] = useState<Milestone[]>([]);
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    async function fetchTimeline() {
+      setLoading(true);
+      setError(null);
+      try {
+        const res = await fetch('/api/affaires/timeline');
+        if (!res.ok) throw new Error("Erreur lors du chargement de la timeline");
+        const data = await res.json();
+        setMilestones(Array.isArray(data.timeline) ? data.timeline : []);
+        setTasks(Array.isArray(data.tasks) ? data.tasks : []);
+      } catch (e: any) {
+        setError(e.message || "Erreur inconnue");
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchTimeline();
+  }, []);
+
   return (
     <>
       <div className="flex justify-between items-center mb-4">
@@ -161,37 +86,45 @@ export default function TimelinePage() {
             <CardContent>
               <div className="relative">
                 <div className="absolute left-4 top-0 bottom-0 w-0.5 bg-gray-200"></div>
-                <div className="space-y-8">
-                  {milestones.map((milestone, index) => (
-                    <div key={index} className="relative pl-10">
-                      <div className="absolute left-0 top-1.5 flex items-center justify-center w-8 h-8 rounded-full bg-white border-2 border-gray-200">
-                        {milestone.status === "completed" && <CheckCircle className="h-5 w-5 text-green-500" />}
-                        {milestone.status === "in-progress" && <AlertCircle className="h-5 w-5 text-yellow-500" />}
-                        {milestone.status === "pending" && <Clock className="h-5 w-5 text-gray-400" />}
-                      </div>
-                      <div className="flex flex-col md:flex-row md:items-center md:justify-between">
-                        <div>
-                          <h3 className="text-lg font-medium text-gray-900">{milestone.name}</h3>
-                          <p className="text-sm text-gray-500 mt-1">{milestone.description}</p>
+                {loading ? (
+                  <div className="text-center text-gray-500 py-8">Chargement des jalons...</div>
+                ) : error ? (
+                  <div className="text-center text-red-500 py-8">{error}</div>
+                ) : milestones.length === 0 ? (
+                  <div className="text-center text-gray-400 py-8">Aucun jalon trouvé.</div>
+                ) : (
+                  <div className="space-y-8">
+                    {milestones.map((milestone: Milestone, index: number) => (
+                      <div key={index} className="relative pl-10">
+                        <div className="absolute left-0 top-1.5 flex items-center justify-center w-8 h-8 rounded-full bg-white border-2 border-gray-200">
+                          {milestone.status === "completed" && <CheckCircle className="h-5 w-5 text-green-500" />}
+                          {milestone.status === "in-progress" && <AlertCircle className="h-5 w-5 text-yellow-500" />}
+                          {milestone.status === "pending" && <Clock className="h-5 w-5 text-gray-400" />}
                         </div>
-                        <div className="mt-2 md:mt-0 md:ml-4">
-                          <Badge
-                            variant={
-                              milestone.status === "completed"
-                                ? "outline"
-                                : milestone.status === "in-progress"
-                                  ? "default"
-                                  : "secondary"
-                            }
-                            className="whitespace-nowrap"
-                          >
-                            {milestone.date}
-                          </Badge>
+                        <div className="flex flex-col md:flex-row md:items-center md:justify-between">
+                          <div>
+                            <h3 className="text-lg font-medium text-gray-900">{milestone.name}</h3>
+                            <p className="text-sm text-gray-500 mt-1">{milestone.description}</p>
+                          </div>
+                          <div className="mt-2 md:mt-0 md:ml-4">
+                            <Badge
+                              variant={
+                                milestone.status === "completed"
+                                  ? "outline"
+                                  : milestone.status === "in-progress"
+                                    ? "default"
+                                    : "secondary"
+                              }
+                              className="whitespace-nowrap"
+                            >
+                              {milestone.date}
+                            </Badge>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  ))}
-                </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>
@@ -204,7 +137,13 @@ export default function TimelinePage() {
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {tasks.map((task) => (
+                {loading ? (
+                  <div className="text-center text-gray-500 py-8">Chargement des tâches...</div>
+                ) : error ? (
+                  <div className="text-center text-red-500 py-8">{error}</div>
+                ) : tasks.length === 0 ? (
+                  <div className="text-center text-gray-400 py-8">Aucune tâche trouvée.</div>
+                ) : tasks.map((task: Task) => (
                   <div
                     key={task.id}
                     className={`p-4 border rounded-lg ${

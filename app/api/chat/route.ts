@@ -365,9 +365,24 @@ export async function POST(req: Request) {
     const contactKeywords = [
       'contact', 'qui contacter', 'qui dois-je contacter', 'à qui m\'adresser', 'référent', 'porteur', 'client', 'moa', 'moeg', 'responsable', 'personne à contacter', 'personne de contact', 'point de contact', 'support', 'mail', 'email', 'téléphone', 'coordonnées'
     ];
+    // Ajout : mots-clés pour la rédaction de mail
+    const mailWritingKeywords = [
+      'rédiger un mail', 'rédiger un email', 'écrire un mail', 'écrire un email', 'envoyer un mail', 'envoyer un email', 'exemple de mail', 'exemple d\'email', 'rédaction mail', 'rédaction email', 'proposer un mail', 'proposer un email', 'générer un mail', 'générer un email', 'mail type', 'email type', 'modèle de mail', 'modèle d\'email', 'mail automatique', 'email automatique', 'mail de relance', 'email de relance', 'mail de demande', 'email de demande', 'mail de réponse', 'email de réponse', 'mail professionnel', 'email professionnel', 'mail formel', 'email formel', 'mail informel', 'email informel'
+    ];
+    // Fonction utilitaire pour vérifier si un message ou une intention correspond à un mot-clé de rédaction de mail
+    function isMailWritingIntent(text: string) {
+      if (typeof text !== 'string') return false;
+      const lower = text.toLowerCase();
+      return mailWritingKeywords.some(kw => lower.includes(kw));
+    }
+    // On ne déclenche la réponse contact que si ce n'est PAS une demande de rédaction de mail
     const isContactIntent = (
-      (intentEntities.intent && /contact|référent|porteur|client|moa|moeg|responsable|support|mail|email|téléphone|coordonnées/i.test(intentEntities.intent)) ||
-      contactKeywords.some(kw => message.toLowerCase().includes(kw))
+      !isMailWritingIntent(typeof message === 'string' ? message : '') &&
+      !isMailWritingIntent(typeof intentEntities.intent === 'string' ? intentEntities.intent : '') &&
+      (
+        (intentEntities.intent && /contact|référent|porteur|client|moa|moeg|responsable|support|mail|email|téléphone|coordonnées/i.test(intentEntities.intent)) ||
+        contactKeywords.some(kw => (typeof message === 'string' ? message : '').toLowerCase().includes(kw))
+      )
     );
     if (isContactIntent && affaireId) {
       // Récupérer les infos de l'affaire

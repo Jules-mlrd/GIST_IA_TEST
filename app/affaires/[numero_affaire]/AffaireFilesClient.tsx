@@ -5,7 +5,7 @@ import { ChatBot } from "@/components/chatbot";
 function FileList({ files }: { files: any[] }) {
   if (!files || files.length === 0) return <div className="text-gray-500">Aucun fichier dans ce dossier.</div>;
   return (
-    <ul className="space-y-2">
+    <ul className="space-y-2 text-base">
       {files.map(file => (
         <li key={file.key} className="flex items-center gap-2">
           <a href={file.url} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline">
@@ -46,7 +46,6 @@ function FileUploadForm({ numero_affaire, onUploaded }: { numero_affaire: string
         setSuccess('Fichier(s) uploadé(s) avec succès.');
         fileInput.current.value = '';
         onUploaded();
-        // Masquer le message de succès après 2 secondes
         if (successTimeout.current) clearTimeout(successTimeout.current);
         successTimeout.current = setTimeout(() => setSuccess(null), 2000);
       } else {
@@ -59,7 +58,6 @@ function FileUploadForm({ numero_affaire, onUploaded }: { numero_affaire: string
     }
   };
 
-  // Efface les messages lors d'une nouvelle sélection de fichier
   const handleFileChange = () => {
     setError(null);
     setSuccess(null);
@@ -103,15 +101,13 @@ export default function AffaireFilesClient({ numero_affaire }: { numero_affaire:
 
   React.useEffect(() => {
     fetchFiles();
-    // eslint-disable-next-line
   }, [numero_affaire]);
 
   return (
-    <div className="bg-white border rounded-lg shadow p-6">
+    <div className="bg-white border rounded-lg shadow p-6 text-base">
       <h2 className="text-lg font-semibold mb-4">Fichiers de l'affaire</h2>
       <FileUploadForm numero_affaire={numero_affaire} onUploaded={fetchFiles} />
       {loading ? <div>Chargement...</div> : <FileList files={files} />}
-      {/* Bloc ChatBot IA */}
       <div className="mt-8">
         <h3 className="text-base font-semibold mb-2 text-sncf-red flex items-center gap-2">
           <span>Assistant IA GIST</span>

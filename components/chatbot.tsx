@@ -42,7 +42,11 @@ type Props = {
 };
 
 // Préférences utilisateur par défaut
-const DEFAULT_USER_PREFS = {
+type UserPrefs = {
+  readFiles: boolean;
+  showPromptByDefault: boolean;
+};
+const DEFAULT_USER_PREFS: UserPrefs = {
   readFiles: true,
   showPromptByDefault: false,
 };
@@ -58,7 +62,7 @@ export function ChatBot({ affaireId, files, loading, affaireName }: Props & { af
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const { toast } = useToast();
   const cardRef = useRef<HTMLDivElement | null>(null);
-  const [userPrefs, setUserPrefs] = useState(() => {
+  const [userPrefs, setUserPrefs] = useState<UserPrefs>(() => {
     if (typeof window !== 'undefined') {
       try {
         return { ...DEFAULT_USER_PREFS, ...JSON.parse(localStorage.getItem('chatbotUserPrefs') || '{}') };
@@ -77,22 +81,18 @@ export function ChatBot({ affaireId, files, loading, affaireName }: Props & { af
   const [explicability, setExplicability] = useState<{ files?: string[]; prompt?: string } | null>(null);
   const [showPromptModal, setShowPromptModal] = useState(false);
 
-  // Synchronise readFiles avec userPrefs
   useEffect(() => {
     setReadFiles(userPrefs.readFiles);
   }, [userPrefs.readFiles]);
-  // Sauvegarde userPrefs dans localStorage à chaque modif
   useEffect(() => {
     if (typeof window !== 'undefined') {
       localStorage.setItem('chatbotUserPrefs', JSON.stringify(userPrefs));
     }
   }, [userPrefs]);
-  // Handler pour changer une préférence
   const handlePrefChange = (key: string, value: boolean) => {
-    setUserPrefs(prefs => ({ ...prefs, [key]: value }));
+    setUserPrefs((prefs: UserPrefs) => ({ ...prefs, [key]: value }));
   };
 
-  // Gestion du clic en dehors pour refermer le ChatBot
   useEffect(() => {
     if (!isOpen) return;
     function handleClickOutside(event: MouseEvent) {
@@ -109,8 +109,6 @@ export function ChatBot({ affaireId, files, loading, affaireName }: Props & { af
   }, [messages]);
 
   useEffect(() => {
-    // Initial summary is no longer a prop, so we don't set it here.
-    // If the user wants to trigger a summary, they will ask for it.
   }, [affaireId]);
 
   const handleFileSelect = (fileKey: string, checked: boolean) => {
@@ -136,25 +134,19 @@ export function ChatBot({ affaireId, files, loading, affaireName }: Props & { af
     }
   };
 
-  // Handler pour le bouton 'Donner des fichiers en contexte'
   const handleFileContextClick = () => {
-    // Pour la démo, toggle le premier fichier du bucket
     if (!files || files.length === 0) return;
     const key = files[0].key;
     setContextFiles(cf => cf.includes(key) ? cf.filter(k => k !== key) : [...cf, key]);
-    // À terme, ouvrir un sélecteur de fichiers
   };
 
-  // Handler pour le bouton "Joindre des fichiers"
   const handleFileButtonClick = () => {
     setPendingContextFiles(contextFiles);
     setShowFileModal(true);
   };
-  // Handler pour la sélection S3
   const handleS3FileToggle = (key: string) => {
     setPendingContextFiles(cf => cf.includes(key) ? cf.filter(k => k !== key) : [...cf, key]);
   };
-  // Handler pour l'upload local
   const handleLocalFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const filesToUpload = e.target.files;
     if (!filesToUpload) return;
@@ -173,12 +165,9 @@ export function ChatBot({ affaireId, files, loading, affaireName }: Props & { af
     setPendingContextFiles(cf => [...cf, ...newKeys]);
     setUploading(false);
   };
-  // Handler pour retirer un fichier sélectionné
   const handleRemoveContextFile = (key: string) => setContextFiles(cf => cf.filter(k => k !== key));
   const handleRemovePendingContextFile = (key: string) => setPendingContextFiles(cf => cf.filter(k => k !== key));
-  // Handler pour fermer la modale
   const handleCloseFileModal = () => setShowFileModal(false);
-  // Handler pour valider la sélection
   const handleValidateFileModal = () => {
     setContextFiles(pendingContextFiles);
     setShowFileModal(false);
@@ -232,7 +221,6 @@ export function ChatBot({ affaireId, files, loading, affaireName }: Props & { af
     }
   };
 
-  // Handler pour l'input utilisateur
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => setInputValue(e.target.value);
   const handleInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter" && !e.shiftKey) {
@@ -241,7 +229,6 @@ export function ChatBot({ affaireId, files, loading, affaireName }: Props & { af
     }
   };
 
-  // Générer le résumé à afficher (exemple : dernier message bot de type résumé, ou null)
   const summary = messages.find(m => m.sender === "bot" && typeof m.content !== 'string')?.content || null;
 
   const renderSummary = (summary: string) => (
@@ -286,7 +273,7 @@ export function ChatBot({ affaireId, files, loading, affaireName }: Props & { af
         onRemoveContextFile={handleRemoveContextFile}
         readFiles={readFiles}
         onToggleReadFiles={() => {
-          setReadFiles(v => {
+          setReadFiles((v: boolean) => {
             handlePrefChange('readFiles', !v);
             return !v;
           });
@@ -298,7 +285,6 @@ export function ChatBot({ affaireId, files, loading, affaireName }: Props & { af
         onPrefChange={handlePrefChange}
       />
       <ChatToggleButton isOpen={isOpen} onClick={() => setIsOpen(!isOpen)} />
-      {/* Modale de sélection/ajout de fichiers */}
       {showFileModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
           <div className="bg-white rounded-2xl shadow-xl p-6 w-full max-w-md relative">
@@ -334,7 +320,6 @@ export function ChatBot({ affaireId, files, loading, affaireName }: Props & { af
           </div>
         </div>
       )}
-      {/* Affichage des fichiers sélectionnés sous la barre de saisie (pills) */}
       {contextFiles.length > 0 && (
         <div className="fixed right-6 bottom-28 z-50 flex flex-wrap gap-2 max-w-md">
           {contextFiles.map(key => {
@@ -348,7 +333,6 @@ export function ChatBot({ affaireId, files, loading, affaireName }: Props & { af
           })}
         </div>
       )}
-      {/* Modale pour afficher le prompt complet (explicabilité) */}
       {showPromptModal && explicability?.prompt && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
           <div className="bg-white rounded-2xl shadow-xl p-6 w-full max-w-2xl relative">

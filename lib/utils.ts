@@ -210,7 +210,6 @@ Réponse :`;
   return [];
 }
 
-// --- CACHE UTILS ---
 import redis from './redisClient';
 
 export async function getCache(key: string): Promise<any | null> {
@@ -230,14 +229,11 @@ export async function setCache(key: string, value: any, ttlSeconds?: number) {
   }
 }
 
-// --- MONITORING UTILS ---
 export async function logMetric(key: string, value: number) {
-  // Incrémente un compteur (ex: nombre de requêtes)
   await redis.incrby(key, value);
 }
 
 export async function logTiming(key: string, durationMs: number) {
-  // Stocke la somme et le nombre pour calculer la moyenne
   await redis.incrby(`${key}:sum`, durationMs);
   await redis.incrby(`${key}:count`, 1);
 }
@@ -255,32 +251,34 @@ export async function logCacheMiss(endpoint: string) {
   await redis.incrby(`metrics:${endpoint}:cache_miss`, 1);
 }
 
-// (Suppression de la fonction extractAndAnalyzeDocument, utiliser lib/server/extractAndAnalyzeDocument.ts)
-
-// --- FILE D'ATTENTE PREANALYSE ---
 const PREANALYSIS_QUEUE = 'preanalysis:queue';
 const PREANALYSIS_STATUS = 'preanalysis:status';
 
 export async function enqueuePreanalysisTask(buffer: Buffer, fileName: string, mimeType: string) {
-  // Stocke le buffer temporairement (clé binaire)
   await redis.set(`preanalysis:buffer:${fileName}`, buffer);
   await redis.expire(`preanalysis:buffer:${fileName}`, 60 * 60); // 1h TTL
   await redis.rpush(PREANALYSIS_QUEUE, JSON.stringify({ fileName, mimeType }));
   await setPreanalysisStatus(fileName, 'pending');
 }
 
+function safeBufferFrom(val: unknown): Buffer | null {
+  if (typeof val === 'string' && val.length > 0 && val !== '[object Object]') {
+    return Buffer.from(val);
+  }
+  return null;
+}
+
 export async function dequeuePreanalysisTask() {
   const taskStr = await redis.lpop(PREANALYSIS_QUEUE);
   if (!taskStr) return null;
   const task = JSON.parse(taskStr);
-  // getBuffer n'existe pas sur ce client Redis, utiliser get et Buffer.from si besoin
   const val = await redis.get(`preanalysis:buffer:${task.fileName}`);
-  const buffer = val ? Buffer.from(val) : null;
+  const buffer = safeBufferFrom(val);
   return { ...task, buffer };
 }
 
 export async function setPreanalysisStatus(fileName: string, status: 'pending' | 'processing' | 'done' | 'error') {
-  await redis.hset(PREANALYSIS_STATUS, fileName, status);
+  await redis.hset(PREANALYSIS_STATUS, { [fileName]: status });
 }
 
 export async function getPreanalysisStatus(fileName: string) {

@@ -1,11 +1,8 @@
 import React, { useRef, useEffect, useState } from "react";
 import { X, Loader2, MoreHorizontal, FileText, Paperclip, ArrowUp, FolderOpen, Settings } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-// Ajout : utilitaire markdown -> HTML
 import { marked } from "marked";
 import DOMPurify from 'dompurify';
-// Si erreur d'import côté client, utiliser :
-// import DOMPurify from 'dompurify';
 
 type Message = {
   id: string;
@@ -41,45 +38,30 @@ type Props = {
   fileButtonLabel?: string;
 };
 
-// Fonction utilitaire pour nettoyer le HTML du résumé IA
 function sanitizeSummaryHtml(html: string): string {
   if (!html) return '';
-  // Supprime les balises problématiques
   let clean = html
     .replace(/<\/?(html|body|head|script|style|iframe)[^>]*>/gi, '')
     .replace(/<meta[^>]*>/gi, '')
     .replace(/<link[^>]*>/gi, '')
     .replace(/<\/?title[^>]*>/gi, '');
-  // Limite la taille
   if (clean.length > 3000) {
     clean = clean.slice(0, 3000) + '...';
   }
   return clean;
 }
 
-// Fonction utilitaire pour transformer le markdown simple en HTML propre
 function markdownToCleanHtml(md: string): string {
-  // On retire les titres (lignes commençant par #)
   md = md.replace(/^#+ .+$/gm, "");
-  // On retire le gras markdown (**) mais garde le texte
   md = md.replace(/\*\*(.*?)\*\*/g, "$1");
-  // On retire l'italique markdown (*) mais garde le texte
   md = md.replace(/\*(.*?)\*/g, "$1");
-  // On retire les liens markdown [texte](url) => texte
   md = md.replace(/\[(.*?)\]\((.*?)\)/g, "$1");
-  // On retire les images ![alt](url)
   md = md.replace(/!\[.*?\]\(.*?\)/g, "");
-  // On retire les blockquotes
   md = md.replace(/^> ?/gm, "");
-  // On retire les codes inline/backticks
   md = md.replace(/`([^`]+)`/g, "$1");
-  // On retire les séparateurs ---
   md = md.replace(/^---+$/gm, "");
-  // On retire les espaces multiples
   md = md.replace(/\n{3,}/g, "\n\n");
-  // On convertit le markdown restant (listes, paragraphes) en HTML
   let html = marked.parse(md) as string;
-  // On purifie le HTML pour éviter tout XSS
   html = DOMPurify.sanitize(html, { ALLOWED_TAGS: ["ul", "ol", "li", "p", "br", "strong", "em", "span"], ALLOWED_ATTR: [] });
   return html;
 }
@@ -91,7 +73,7 @@ const ChatBotPanel: React.FC<Props & {
   contextFiles: string[];
   onRemoveContextFile?: (key: string) => void;
   suggestions?: string[];
-  explicability?: { files?: string[]; prompt?: string };
+  explicability?: { files?: string[]; prompt?: string } | null;
   onShowPromptModal?: () => void;
   userPrefs?: { readFiles: boolean; showPromptByDefault: boolean };
   onPrefChange?: (key: string, value: boolean) => void;
@@ -126,7 +108,6 @@ const ChatBotPanel: React.FC<Props & {
   const [showPrefs, setShowPrefs] = useState(false);
   const menuRef = useRef<HTMLDivElement | null>(null);
 
-  // Ferme le menu si clic en dehors
   useEffect(() => {
     if (!menuOpen) return;
     const handleClick = (e: MouseEvent) => {
@@ -142,7 +123,6 @@ const ChatBotPanel: React.FC<Props & {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, isTyping]);
 
-  // Désactive le scroll du body quand le chatbot est ouvert
   useEffect(() => {
     if (isOpen) {
       const original = document.body.style.overflow;
@@ -155,7 +135,6 @@ const ChatBotPanel: React.FC<Props & {
     <AnimatePresence>
       {isOpen && (
         <>
-          {/* Overlay */}
           <motion.div
             className="fixed inset-0 bg-black bg-opacity-30 z-40"
             initial={{ opacity: 0 }}
@@ -164,7 +143,6 @@ const ChatBotPanel: React.FC<Props & {
             transition={{ duration: 0.2 }}
             onClick={onClose}
           />
-          {/* Panneau latéral structuré */}
           <motion.div
             className="fixed right-0 bottom-0 top-0 w-full max-w-md z-50 flex flex-col h-full bg-white rounded-3xl shadow-2xl border border-sncf-red animate-fade-in"
             initial={{ x: 400, opacity: 0 }}
@@ -173,13 +151,11 @@ const ChatBotPanel: React.FC<Props & {
             transition={{ type: "spring", stiffness: 300, damping: 30 }}
             onClick={e => e.stopPropagation()}
           >
-            {/* Header sticky */}
             <div className="sticky top-0 z-10 flex items-center justify-between px-6 py-4 bg-sncf-red text-white rounded-t-3xl">
               <div className="font-bold text-lg truncate">
                 {affaireName || affaireId}
               </div>
               <div className="flex items-center gap-2">
-                {/* Menu déroulant */}
                 <div className="relative" ref={menuRef}>
                   <button
                     className="p-2 rounded-full hover:bg-white/20 focus:outline-none"
@@ -200,7 +176,6 @@ const ChatBotPanel: React.FC<Props & {
                       <button className="w-full text-left px-4 py-2 hover:bg-gray-200 rounded-b-xl" onClick={() => { setMenuOpen(false); /* TODO: copier */ }}>Copier la conversation</button>
                     </div>
                   )}
-                  {/* Modale Préférences */}
                   {showPrefs && (
                     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
                       <div className="bg-white rounded-2xl shadow-xl p-6 w-full max-w-xs relative">
@@ -228,13 +203,11 @@ const ChatBotPanel: React.FC<Props & {
                 </button>
               </div>
             </div>
-            {/* Résumé (optionnel) */}
             {summary && (
               <div className="px-6 py-3 border-b bg-gray-50 text-sm text-gray-700">
                 {summary}
               </div>
             )}
-            {/* Corps scrollable (historique) */}
             <div
               className="flex-1 min-h-0 overflow-y-auto py-6 px-4 pb-36 bg-white rounded-xl border border-gray-200 shadow-lg scrollbar-thin scrollbar-thumb-sncf-red/60 scrollbar-track-gray-100 border-dashed border-2 border-blue-200"
               style={{ WebkitOverflowScrolling: 'touch' }}
@@ -248,7 +221,6 @@ const ChatBotPanel: React.FC<Props & {
                     transition={{ delay: idx * 0.03 }}
                     className={`flex w-full ${msg.sender === "user" ? "justify-end" : "justify-start"}`}
                   >
-                    {/* Résumé IA encapsulé dans une bulle spéciale */}
                     {msg.sender === "bot" ? (
                       <div
                         className="rounded-2xl px-4 py-2 max-w-[80%] bg-gray-50 text-gray-900 self-start shadow-sm text-sm leading-relaxed chatbot-ia-bubble"
@@ -264,7 +236,6 @@ const ChatBotPanel: React.FC<Props & {
                         {msg.content}
                       </div>
                     )}
-                    {/* Suggestions et explicabilité sous la dernière réponse IA */}
                     {idx === messages.length - 1 && msg.sender === "bot" && (
                       <div className="w-full mt-2 flex flex-col gap-2">
                         {suggestions && suggestions.length > 0 && (
@@ -299,7 +270,6 @@ const ChatBotPanel: React.FC<Props & {
                 <div ref={messagesEndRef} />
               </div>
             </div>
-            {/* Footer fixe */}
             <div className="sticky bottom-0 z-10 px-4 py-5 border-t bg-white flex gap-2 items-center rounded-b-3xl">
               <input
                 type="text"
@@ -311,7 +281,6 @@ const ChatBotPanel: React.FC<Props & {
                 disabled={loading || isTyping}
                 autoComplete="off"
               />
-              {/* Bouton joindre fichier (trombone) */}
               {onFileButtonClick && (
                 <button
                   className="ml-1 p-2 rounded-full hover:bg-gray-100 transition-colors"
@@ -322,7 +291,6 @@ const ChatBotPanel: React.FC<Props & {
                   <Paperclip className="h-5 w-5 text-sncf-red" />
                 </button>
               )}
-              {/* Toggle lecture fichiers */}
               <button
                 className={`ml-1 p-2 rounded-full border ${readFiles ? 'bg-blue-50 border-blue-400' : 'bg-gray-100 border-gray-300'} hover:bg-blue-100 transition-colors`}
                 onClick={onToggleReadFiles}
@@ -331,7 +299,6 @@ const ChatBotPanel: React.FC<Props & {
               >
                 <FileText className={`h-5 w-5 ${readFiles ? 'text-blue-600' : 'text-gray-400'}`} />
               </button>
-              {/* Bouton envoyer (flèche) */}
               <button
                 className="ml-1 p-2 rounded-full bg-sncf-red hover:bg-red-700 disabled:opacity-60 transition-colors"
                 onClick={onSendMessage}
