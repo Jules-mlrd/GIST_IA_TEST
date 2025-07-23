@@ -4,6 +4,7 @@ import { listTxtFilesInS3, fetchTxtContentFromS3, fetchHtmlTextFromS3 } from '@/
 import { extractRisksWithLLM } from '@/lib/utils';
 import fs from 'fs';
 import path from 'path';
+import redis from '@/lib/redisClient';
 
 const BUCKET_NAME = 'gism-documents';
 const EXTRACTED_RISKS_FILE = path.join(process.cwd(), 'extracted-risks.json');
@@ -114,23 +115,69 @@ export async function POST_refresh(_: Request) {
 
 export async function GET(req: Request) {
   try {
+    const url = new URL(req.url || '', 'http://localhost');
+    const affaire = url.searchParams.get('affaire');
+    const refresh = url.searchParams.get('refresh') === '1';
+
     let risks = readExtractedRisks();
     const manualRisks = readManualRisks();
     const allRisks = [...manualRisks, ...risks];
     // Filtrage par affaire si paramètre présent
     let filteredRisks = allRisks;
-    if (req && typeof req.url === 'string') {
-      const url = new URL(req.url, 'http://localhost');
-      const affaire = url.searchParams.get('affaire');
-      if (affaire) {
-        filteredRisks = allRisks.filter(r =>
-          (r.affaire && r.affaire === affaire) ||
-          (r.key && r.key.includes(affaire))
-        );
+    if (affaire) {
+      const cacheKey = `affaire:${affaire}:risks`;
+      let cacheTimestamp = Date.now();
+      if (!refresh) {
+        const cached = await redis.get(cacheKey);
+        if (cached) {
+          try {
+            const parsed = JSON.parse(cached);
+            cacheTimestamp = parsed.cacheTimestamp || cacheTimestamp;
+            const etag = `"${cacheTimestamp}"`;
+            if (req.headers.get('if-none-match') === etag) {
+              return new Response(null, { status: 304 });
+            }
+            const response = NextResponse.json(parsed);
+            response.headers.set('ETag', etag);
+            return response;
+          } catch {}
+        }
       }
+      filteredRisks = allRisks.filter(r =>
+        (r.affaire && r.affaire === affaire) ||
+        (r.key && r.key.includes(affaire))
+      );
+      const cacheTimestampNew = Date.now();
+      const result = { risks: filteredRisks, cacheTimestamp: cacheTimestampNew };
+      await redis.set(cacheKey, JSON.stringify(result), { ex: 3600 });
+      const etag = `"${cacheTimestampNew}"`;
+      if (req.headers.get('if-none-match') === etag) {
+        return new Response(null, { status: 304 });
+      }
+      const response = NextResponse.json(result);
+      response.headers.set('ETag', etag);
+      return response;
     }
     return NextResponse.json({ risks: filteredRisks });
   } catch (error) {
     return NextResponse.json({ error: 'Erreur lors de l\'extraction des risques.' }, { status: 500 });
+  }
+}
+
+// Endpoint de diagnostic : liste les fichiers S3 pour une affaire
+export async function GET_s3_files(req: Request) {
+  try {
+    const url = new URL(req.url || '', 'http://localhost');
+    const affaire = url.searchParams.get('affaire');
+    if (!affaire) {
+      return NextResponse.json({ error: 'Paramètre affaire requis.' }, { status: 400 });
+    }
+    const pdfFiles = await listPdfFilesInS3(BUCKET_NAME);
+    const txtFiles = await listTxtFilesInS3(BUCKET_NAME);
+    const matchingPdf = pdfFiles.filter(key => key.includes(affaire));
+    const matchingTxt = txtFiles.filter(key => key.includes(affaire));
+    return NextResponse.json({ pdf: matchingPdf, txt: matchingTxt });
+  } catch (error) {
+    return NextResponse.json({ error: 'Erreur lors de la lecture des fichiers S3.' }, { status: 500 });
   }
 } 

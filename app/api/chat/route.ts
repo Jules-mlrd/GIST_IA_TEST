@@ -125,7 +125,7 @@ async function summarizeHistory(history: { role: string, content: string }[]): P
         { role: 'user', content: prompt },
       ],
       temperature: 0.3,
-      max_tokens: 400,
+      max_tokens: 4096,
     }),
   });
   if (!response.ok) return "";
@@ -148,7 +148,7 @@ async function extractIntentAndEntities(message: string): Promise<{ intent?: str
         { role: 'user', content: prompt },
       ],
       temperature: 0.2,
-      max_tokens: 300,
+      max_tokens: 4096,
     }),
   });
   if (!response.ok) return { intent: '', entities: [] };
@@ -356,7 +356,7 @@ export async function POST(req: Request) {
         if (affaire.contact_moa_moeg) contactLines.push(`Contact MOA/MOEG : ${affaire.contact_moa_moeg}`);
         if (affaire.guichet) contactLines.push(`Guichet : ${affaire.guichet}`);
         if (contactLines.length > 0) {
-          contactContext = `\n\nPour l'affaire en cours, les contacts sont :\n- ${contactLines.join('\n- ')}\n\nSi l'utilisateur pose une question sur qui contacter, à qui s'adresser, ou toute question relative aux contacts, répondez précisément avec ces informations. Sinon, répondez normalement.`;
+          contactContext = `\n\nSi l'utilisateur pose une question sur les contacts (qui contacter, à qui s'adresser, etc.), réponds précisément avec ces informations :\n- ${contactLines.join('\n- ')}\nSinon, réponds normalement et n'utilise ces informations que si c'est pertinent.`;
         }
       }
     }
@@ -459,19 +459,17 @@ export async function POST(req: Request) {
     ) {
       await updateMemory(userId, { currentFile: undefined });
     }
-    memory.history.push({ role: "user", content: resolvedMessage });
-    if (
-      pronounPattern.test(message) &&
-      !foundFile &&
-      !(memory.lastDoc || memory.lastTxt)
-    ) {
-      memory.history.push({
-        role: "assistant",
-        content: "À quel document ou fichier faites-vous référence ? Veuillez préciser le nom ou le contexte.",
-      });
-      return NextResponse.json({
-        reply: "À quel document ou fichier faites-vous référence ? Veuillez préciser le nom ou le contexte.",
-      });
+    // Ajout : Calculer l'embedding du message utilisateur dès le début
+    const currentUserEmbedding = await getEmbeddingOpenAI(resolvedMessage);
+    // Ajout : Ajouter le message utilisateur avec embedding et timestamp dans l'historique
+    memory.history.push({ role: "user", content: resolvedMessage, embedding: currentUserEmbedding, timestamp: Date.now() });
+    // Ajout : Générer un résumé de contexte si l'historique dépasse 10 messages
+    if (memory.history.length > 10) {
+      const summary = await summarizeHistory(memory.history);
+      if (summary) {
+        await updateMemory(userId, { contextSummary: summary });
+        memory.contextSummary = summary;
+      }
     }
     if (memory.history.length > 10) {
       const summary = await summarizeHistory(memory.history);
@@ -618,7 +616,7 @@ export async function POST(req: Request) {
           model: 'gpt-3.5-turbo',
           messages: openaiMessages,
           temperature: 0.7,
-          max_tokens: 1000,
+          max_tokens: 4096,
         }),
       });
       if (!response.ok) {
@@ -660,7 +658,7 @@ export async function POST(req: Request) {
               model: 'gpt-3.5-turbo',
               messages: openaiMessages,
               temperature: 0.7,
-              max_tokens: 500,
+              max_tokens: 4096,
             }),
           });
           if (!response.ok) {
@@ -695,7 +693,7 @@ export async function POST(req: Request) {
             model: 'gpt-3.5-turbo',
             messages: openaiMessages,
             temperature: 0.7,
-            max_tokens: 1000,
+            max_tokens: 4096,
           }),
         });
         if (!response.ok) {
@@ -719,11 +717,12 @@ export async function POST(req: Request) {
     }
     const openaiMessages = [
       { role: "system", content: SYSTEM_PROMPT + contactContext },
+      memory.contextSummary ? { role: "system", content: `Résumé du contexte : ${memory.contextSummary}` } : undefined,
       contextFilesText ? { role: "system", content: `Contexte extrait des fichiers sélectionnés :\n${contextFilesText}` } : undefined,
       semanticContext ? { role: "system", content: `Contexte extrait par recherche sémantique :\n${semanticContext}` } : undefined,
-      memory.contextSummary ? { role: "system", content: `Résumé du contexte : ${memory.contextSummary}` } : undefined,
       memory.userGoals && memory.userGoals.length ? { role: "system", content: `Objectifs utilisateur détectés : ${memory.userGoals.join(", ")}` } : undefined,
       memory.keyEntities && memory.keyEntities.length ? { role: "system", content: `Entités clés détectées : ${memory.keyEntities.map(e => `${e.type}: ${e.value}`).join("; ")}` } : undefined,
+      // Limiter l'historique à 10 derniers messages pertinents
       ...memory.history.slice(-10)
         .filter((m): m is { role: "user" | "assistant"; content: string } => !!m && (m.role === "user" || m.role === "assistant") && typeof m.content === 'string')
         .map(m => ({
@@ -806,7 +805,7 @@ export async function POST(req: Request) {
         model: 'gpt-3.5-turbo',
         messages: openaiMessages,
         temperature: 0.7,
-        max_tokens: 1000,
+        max_tokens: 4096,
       }),
     });
     if (!response.ok) {
@@ -816,6 +815,7 @@ export async function POST(req: Request) {
     const data = await response.json();
     const reply = data.choices?.[0]?.message?.content || "Aucune réponse générée.";
     memory.history.push({ role: "assistant", content: reply });
+    await updateMemory(userId, memory);
 
     let contextForSuggestions = '';
     if (memory.contextSummary) contextForSuggestions += `Résumé du contexte : ${memory.contextSummary}\n`;
@@ -824,7 +824,6 @@ export async function POST(req: Request) {
     // Supprimer les suggestions dans tous les NextResponse.json
     // 1. Chercher tous les appels à generateSuggestions et les supprimer
     // 2. Ne pas inclure suggestions dans les objets retournés
-    const userEmbedding = await getEmbeddingOpenAI(message);
     let similarPast = null;
     if (memory.history && memory.history.length > 0) {
       let bestScore = 0;
@@ -832,7 +831,7 @@ export async function POST(req: Request) {
       for (let i = 0; i < memory.history.length; i++) {
         const h = memory.history[i];
         if (h.role === 'user' && h.embedding) {
-          const score = cosineSimilarity(userEmbedding, h.embedding);
+          const score = cosineSimilarity(currentUserEmbedding, h.embedding);
           if (score > bestScore) {
             bestScore = score;
             bestIdx = i;
@@ -855,10 +854,10 @@ export async function POST(req: Request) {
         };
       }
     }
-    memory.history.push({ role: "user", content: message, embedding: userEmbedding, timestamp: Date.now() });
+    memory.history.push({ role: "user", content: message, embedding: currentUserEmbedding, timestamp: Date.now() });
 
     // Mise en cache de la réponse IA
-    await cacheUserResponse(userId, message, userEmbedding, reply);
+    await cacheUserResponse(userId, message, currentUserEmbedding, reply);
 
     // --- Log du temps de réponse et du nombre de requêtes ---
     const duration = Date.now() - start;

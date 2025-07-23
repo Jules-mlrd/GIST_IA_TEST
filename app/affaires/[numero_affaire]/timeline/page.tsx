@@ -19,6 +19,7 @@ import {
   LabelList,
   Cell,
 } from "recharts";
+import AffaireLayout from "@/components/AffaireLayout";
 
 export default function TimelineAffairePage() {
   const params = useParams();
@@ -55,17 +56,7 @@ export default function TimelineAffairePage() {
   }, [affaire]);
 
   return (
-    <div className="max-w-4xl mx-auto py-8 px-2">
-      <div className="mb-6 flex justify-start">
-        <a
-          href={`/affaires/${affaire}`}
-          className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-sncf-red text-white font-semibold text-base shadow hover:bg-red-700 transition-colors focus:outline-none focus:ring-2 focus:ring-sncf-red focus:ring-offset-2"
-          title={`Retour à l'affaire ${affaire}`}
-        >
-          <span className="text-lg">←</span>
-          Affaire {affaire}
-        </a>
-      </div>
+    <AffaireLayout numero_affaire={affaire} active="timeline">
       <h1 className="text-2xl font-bold text-purple-800 mb-6 text-center">Timeline de l'affaire {affaire && <span className="text-gray-500 font-normal ml-2">{affaire}</span>}</h1>
       <div className="flex justify-between items-center mb-4">
         <div className="flex items-center gap-2">
@@ -275,6 +266,6 @@ export default function TimelineAffairePage() {
           </TabsContent>
         </Tabs>
       )}
-    </div>
+    </AffaireLayout>
   );
 } 

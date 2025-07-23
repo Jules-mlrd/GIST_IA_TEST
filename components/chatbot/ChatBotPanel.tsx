@@ -123,6 +123,15 @@ const ChatBotPanel: React.FC<Props & {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, isTyping]);
 
+  // Ajout : scroll automatique à l'ouverture du chatbot
+  useEffect(() => {
+    if (isOpen) {
+      setTimeout(() => {
+        messagesEndRef.current?.scrollIntoView({ behavior: "auto" });
+      }, 0);
+    }
+  }, [isOpen]);
+
   useEffect(() => {
     if (isOpen) {
       const original = document.body.style.overflow;

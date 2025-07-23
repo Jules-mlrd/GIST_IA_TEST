@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { headers } from 'next/headers';
+import AffaireNav from "@/components/AffaireNav";
 
 function displayValue(val: any) {
   if (val === null || val === undefined || val === '' || val === 'nr' || val === 'Empty' || val === '-') return 'Non renseigné';
@@ -22,12 +23,7 @@ export default async function NoteTravauxPage({ params }: { params: { numero_aff
 
   return (
     <div className="py-8 px-2 text-base">
-      <nav className="flex gap-2 mb-8 border-b pb-2">
-        <Link href={`../`} className="px-4 py-2 rounded-t-lg font-semibold text-gray-700 hover:bg-gray-100 border-b-2 border-transparent hover:border-blue-400 transition">
-          Retour à l'affaire
-        </Link>
-        <span className="px-4 py-2 rounded-t-lg font-semibold text-blue-700 border-b-2 border-blue-600 bg-blue-50">Note travaux</span>
-      </nav>
+      <AffaireNav numero_affaire={numero_affaire} active="notes-travaux" />
       <div className="w-full max-w-full mx-auto mt-4">
         <div className="bg-black rounded-t-lg px-6 py-5">
           <h2 className="text-lg font-bold text-white">Description</h2>

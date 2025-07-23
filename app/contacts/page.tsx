@@ -8,6 +8,7 @@ import { Mail, Phone } from "lucide-react"
 import { useEffect, useState } from "react"
 import { useSearchParams } from "next/navigation"
 import { useRouter } from "next/navigation"
+import AffaireLayout from "@/components/AffaireLayout";
 
 function getFullName(contact: any) {
   if (contact.prenom || contact.nom) {
@@ -81,32 +82,7 @@ export default function ContactsPage() {
   })
 
   return (
-    <div className="w-full max-w-none py-8 px-2 md:px-8">
-      {affaire && (
-        <div className="mb-6 flex justify-start gap-4 items-center">
-          <a
-            href={`/affaires/${affaire}`}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-sncf-red text-white font-semibold text-base shadow hover:bg-red-700 transition-colors focus:outline-none focus:ring-2 focus:ring-sncf-red focus:ring-offset-2"
-            title={`Retour à l'affaire ${affaire}`}
-          >
-            <span className="text-lg">←</span>
-            Affaire {affaire}
-          </a>
-          <button
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-gray-200 text-gray-800 font-semibold text-base shadow hover:bg-gray-300 transition-colors focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-offset-2"
-            disabled={refreshing}
-            onClick={async () => {
-              setRefreshing(true);
-              await fetch(`/api/contacts?affaire=${encodeURIComponent(affaire)}&refresh=1`);
-              setRefreshing(false);
-              router.refresh();
-            }}
-            title="Rafraîchir les contacts de l'affaire"
-          >
-            {refreshing ? 'Rafraîchissement...' : 'Rafraîchir les contacts'}
-          </button>
-        </div>
-      )}
+    <AffaireLayout numero_affaire={affaire} active="contacts">
       <div className="flex items-center gap-3 mb-10">
         <div className="bg-sncf-red rounded-full p-3 flex items-center justify-center">
           <Mail className="h-7 w-7 text-white" />
@@ -163,6 +139,6 @@ export default function ContactsPage() {
           ))}
         </div>
       )}
-    </div>
+    </AffaireLayout>
   )
 }

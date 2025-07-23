@@ -5,6 +5,7 @@ import { extractContactsWithLLM } from '@/lib/utils';
 import fs from 'fs';
 import path from 'path';
 import { writeJsonToS3, readJsonFromS3 } from '@/lib/s3Client';
+import redis from '@/lib/redisClient';
 
 const BUCKET_NAME = 'gism-documents';
 const CONTACTS_FILE = path.join(process.cwd(), 'manual-contacts.json');
@@ -84,54 +85,72 @@ export async function GET(req: Request) {
     const refresh = url.searchParams.get('refresh') === '1';
     let contacts = [];
     if (affaire) {
-      // --- CACHE PAR AFFAIRE SUR S3 AVEC TTL ---
-      let cached = null;
+      const cacheKey = `affaire:${affaire}:contacts`;
+      let cacheTimestamp = Date.now();
       if (!refresh) {
-        cached = await readAffaireContactsCacheS3(affaire);
+        const cached = await redis.get(cacheKey);
+        if (cached) {
+          try {
+            const parsed = JSON.parse(cached);
+            cacheTimestamp = parsed.cacheTimestamp || cacheTimestamp;
+            const etag = `"${cacheTimestamp}"`;
+            if (req.headers.get('if-none-match') === etag) {
+              return new Response(null, { status: 304 });
+            }
+            const response = NextResponse.json(parsed);
+            response.headers.set('ETag', etag);
+            return response;
+          } catch {}
+        }
       }
-      if (cached && cached.length) {
-        contacts = cached;
-      } else {
-        // Extraction des contacts uniquement pour le dossier de l'affaire
-        const prefix = `affaires/${affaire}/`;
-        const [pdfFiles, txtFiles] = await Promise.all([
-          listPdfFilesInS3(BUCKET_NAME),
-          listTxtFilesInS3(BUCKET_NAME),
-        ]);
-        const affairePdfFiles = pdfFiles.filter(key => key.startsWith(prefix));
-        const affaireTxtFiles = txtFiles.filter(key => key.startsWith(prefix));
-        const allFiles = [
-          ...affairePdfFiles.map((key) => ({ key, type: 'pdf' })),
-          ...affaireTxtFiles.map((key) => ({ key, type: 'txt' })),
-        ];
-        const texts = await Promise.all(
-          allFiles.map(async ({ key, type }) => {
-            try {
-              if (type === 'pdf') {
-                return await fetchPdfTextFromS3(BUCKET_NAME, key);
-              } else if (type === 'txt') {
-                return await fetchTxtContentFromS3(BUCKET_NAME, key);
-              } else {
-                return '';
-              }
-            } catch (e) {
+      // Extraction des contacts uniquement pour le dossier de l'affaire
+      const prefix = `affaires/${affaire}/`;
+      const [pdfFiles, txtFiles] = await Promise.all([
+        listPdfFilesInS3(BUCKET_NAME),
+        listTxtFilesInS3(BUCKET_NAME),
+      ]);
+      const affairePdfFiles = pdfFiles.filter(key => key.startsWith(prefix));
+      const affaireTxtFiles = txtFiles.filter(key => key.startsWith(prefix));
+      const allFiles = [
+        ...affairePdfFiles.map((key) => ({ key, type: 'pdf' })),
+        ...affaireTxtFiles.map((key) => ({ key, type: 'txt' })),
+      ];
+      const texts = await Promise.all(
+        allFiles.map(async ({ key, type }) => {
+          try {
+            if (type === 'pdf') {
+              return await fetchPdfTextFromS3(BUCKET_NAME, key);
+            } else if (type === 'txt') {
+              return await fetchTxtContentFromS3(BUCKET_NAME, key);
+            } else {
               return '';
             }
-          })
-        );
-        const contactsArrays = await Promise.all(
-          texts.map(async (text) => {
-            if (!text || text.length < 30) return [];
-            try {
-              return await extractContactsWithLLM(text);
-            } catch {
-              return [];
-            }
-          })
-        );
-        contacts = contactsArrays.flat();
-        await writeAffaireContactsCacheS3(affaire, contacts);
+          } catch (e) {
+            return '';
+          }
+        })
+      );
+      const contactsArrays = await Promise.all(
+        texts.map(async (text) => {
+          if (!text || text.length < 30) return [];
+          try {
+            return await extractContactsWithLLM(text);
+          } catch {
+            return [];
+          }
+        })
+      );
+      contacts = contactsArrays.flat();
+      const cacheTimestampNew = Date.now();
+      const result = { contacts: contacts, cacheTimestamp: cacheTimestampNew };
+      await redis.set(cacheKey, JSON.stringify(result), { ex: 3600 });
+      const etag = `"${cacheTimestampNew}"`;
+      if (req.headers.get('if-none-match') === etag) {
+        return new Response(null, { status: 304 });
       }
+      const response = NextResponse.json(result);
+      response.headers.set('ETag', etag);
+      return response;
     } else {
       // Comportement global (tous les fichiers)
       contacts = readExtractedContacts();

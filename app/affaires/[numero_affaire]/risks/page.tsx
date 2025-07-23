@@ -7,6 +7,7 @@ import { AlertTriangle, PlusCircle, Trash2 } from "lucide-react"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { useEffect, useState } from "react"
 import { useSearchParams } from "next/navigation"
+import AffaireLayout from "@/components/AffaireLayout";
 
 const RISKS_CACHE_KEY = 'risks_cache_v1';
 const RISKS_CACHE_EXPIRATION_MS = 10 * 60 * 1000; // 10 minutes
@@ -135,19 +136,7 @@ export default function AffaireRisksPage() {
   const displayedRisks = risks.filter(risk => !blacklist.includes(risk.description))
 
   return (
-    <div className="flex flex-col items-center mx-auto max-w-4xl w-full py-8 px-2">
-      {affaireParam && (
-        <div className="mb-6 flex justify-start w-full">
-          <a
-            href={`/affaires/${affaireParam}`}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-sncf-red text-white font-semibold text-base shadow hover:bg-red-700 transition-colors focus:outline-none focus:ring-2 focus:ring-sncf-red focus:ring-offset-2"
-            title={`Retour à l'affaire ${affaireParam}`}
-          >
-            <span className="text-lg">←</span>
-            Affaire {affaireParam}
-          </a>
-        </div>
-      )}
+    <AffaireLayout numero_affaire={affaireParam || ""} active="risques">
       <div className="mb-8 w-full">
         <h1 className="text-2xl font-bold text-orange-800 text-center">Risques {affaireParam && <span className="text-gray-500 font-normal ml-2">Affaire {affaireParam}</span>}</h1>
       </div>
@@ -256,6 +245,6 @@ export default function AffaireRisksPage() {
           </CardContent>
         </Card>
       )}
-    </div>
+    </AffaireLayout>
   )
 } 

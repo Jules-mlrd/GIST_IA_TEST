@@ -11,6 +11,7 @@ import { Bar, Line, Pie } from "react-chartjs-2"
 import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from "@/components/ui/select"
 import { X, Plus } from "lucide-react"
 import { useSearchParams } from "next/navigation";
+import AffaireLayout from "@/components/AffaireLayout";
 // @ts-ignore
 import jsPDF from "jspdf";
 // @ts-ignore
@@ -988,7 +989,7 @@ function UploadModal({
 
 export default function AiDashboardPage() {
   const searchParams = useSearchParams();
-  const affaireParam = searchParams?.get('affaire');
+  const affaire = searchParams?.get("affaire") || "";
   const [documents, setDocuments] = useState<S3Document[]>([])
   const {
     widgets,
@@ -1069,8 +1070,8 @@ export default function AiDashboardPage() {
   }
 
   // Filtrer les documents par affaire si affaireParam est défini
-  const filteredDocuments = affaireParam
-    ? documents.filter(doc => doc.key.includes(affaireParam))
+  const filteredDocuments = affaire
+    ? documents.filter(doc => doc.key.includes(affaire))
     : documents;
 
   // Téléchargement du résumé global
@@ -1188,25 +1189,13 @@ export default function AiDashboardPage() {
   }
 
   return (
-    <div className="w-full max-w-none py-8 px-2 md:px-8">
-      {affaireParam && (
-        <div className="mb-6 flex justify-start">
-          <a
-            href={`/affaires/${affaireParam}`}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-sncf-red text-white font-semibold text-base shadow hover:bg-red-700 transition-colors focus:outline-none focus:ring-2 focus:ring-sncf-red focus:ring-offset-2"
-            title={`Retour à l'affaire ${affaireParam}`}
-          >
-            <span className="text-lg">←</span>
-            Affaire {affaireParam}
-          </a>
-        </div>
-      )}
+    <AffaireLayout numero_affaire={affaire} active="dashboard">
       {/* TopNavBar est déjà inclus par le layout global */}
       <header className="sticky top-0 z-30 bg-white/90 backdrop-blur flex items-center justify-between px-6 py-3 shadow-sm border-b border-gray-100 max-w-5xl mx-auto w-full">
         <div className="flex items-center gap-3">
           <BarChart3 className="h-8 w-8 text-blue-600" />
           <h1 className="text-xl font-bold text-blue-900 tracking-tight">
-            Dashboard IA {affaireParam && <span className="text-gray-500 font-normal ml-2">Affaire {affaireParam}</span>}
+            Dashboard IA {affaire && <span className="text-gray-500 font-normal ml-2">Affaire {affaire}</span>}
           </h1>
         </div>
         <div className="flex items-center gap-2">
@@ -1296,6 +1285,6 @@ export default function AiDashboardPage() {
         setDragActive={setDragActive}
         fileInputRef={fileInputRef}
       />
-    </div>
+    </AffaireLayout>
   )
 } 
