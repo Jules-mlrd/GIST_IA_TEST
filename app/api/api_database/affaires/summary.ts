@@ -1,13 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
-import mysql from 'mysql2/promise';
+import { PrismaClient } from '@/lib/generated/prisma';
 import { listPdfFilesInS3, fetchPdfTextFromS3 } from '@/lib/readPdf';
 import { listTxtFilesInS3, fetchTxtContentFromS3 } from '@/lib/readTxt';
-import type { RowDataPacket } from 'mysql2';
 
 const BUCKET_NAME = 'gism-documents';
 const SUPPORTED_EXTENSIONS = ['.pdf', '.txt'];
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 const OPENAI_API_URL = 'https://api.openai.com/v1/chat/completions';
+
+const prisma = new PrismaClient();
 
 async function askOpenAISummary(text: string) {
   const messages = [
@@ -41,30 +42,16 @@ export async function GET(req: NextRequest) {
     if (!numero_affaire) return NextResponse.json({ error: "Paramètre numero_affaire requis" }, { status: 400 });
 
     // 1. Lecture de la base
-    const connection = await mysql.createConnection({
-      host: '127.0.0.1',
-      port: 3306,
-      user: 'root',
-      password: 'DevMySQL2024!',
-      database: 'gestion_affaires',
-    });
-    const [rows] = await connection.execute('SELECT * FROM affaires WHERE numero_affaire = ?', [numero_affaire]);
-    await connection.end();
-    if (!Array.isArray(rows) || rows.length === 0) {
+    const affaire = await prisma.affaires.findFirst({ where: { numero_affaire } });
+    if (!affaire) {
       return NextResponse.json({ error: "Affaire non trouvée" }, { status: 404 });
     }
-    const affaire = rows[0] as any;
 
-    // 2. Récupération des documents S3 associés (optionnel)
-    // (Suppression du traitement S3 : on ne traite que la base de données)
     let allTexts: string[] = [];
 
-    // 3. Concatène les champs pertinents de la base
-    let baseText = `Titre: ${affaire.titre || ''}\nDescription: ${affaire.description || ''}\nEtat: ${affaire.etat || ''}\nClient: ${affaire.client || ''}\nPorteur: ${affaire.porteur || ''}\nType de demande: ${affaire.type_demande || ''}\n...`;
-    // Ajoute d'autres champs si besoin
+    let baseText = `Titre: ${affaire.titre || ''}\nDescription: ${affaire.description_technique || ''}\nEtat: ${affaire.etat || ''}\nClient: ${affaire.client || ''}\nPorteur: ${affaire.porteur || ''}\nType de demande: ${affaire.type_demande || ''}\n...`;
     const fullText = [baseText, ...allTexts].join('\n\n');
 
-    // 4. Appel IA pour résumé
     const summary = await askOpenAISummary(fullText.slice(0, 9000)); // Limite la taille
 
     return NextResponse.json({ summary, affaire });

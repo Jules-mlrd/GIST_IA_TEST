@@ -1,18 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server';
-import mysql from 'mysql2/promise';
+import { PrismaClient } from '@/lib/generated/prisma';
+
+const prisma = new PrismaClient();
 
 export async function GET(req: NextRequest) {
   try {
-    const connection = await mysql.createConnection({
-      host: '127.0.0.1',
-      port: 3306,
-      user: 'root',
-      password: 'DevMySQL2024!',
-      database: 'gestion_affaires',
+    const referentsRaw = await prisma.affaires.findMany({
+      where: {
+        referent: {
+          not: null,
+          notIn: [""]
+        }
+      },
+      select: { referent: true },
+      distinct: ['referent'],
+      orderBy: { referent: 'asc' }
     });
-    const [rows] = await connection.execute('SELECT DISTINCT referent FROM affaires WHERE referent IS NOT NULL AND referent != "" ORDER BY referent ASC');
-    await connection.end();
-    const referents = (rows as any[]).map(r => r.referent);
+    const referents = referentsRaw.map(r => r.referent);
     return NextResponse.json({ success: true, referents });
   } catch (error: any) {
     return NextResponse.json({ success: false, error: error.message });

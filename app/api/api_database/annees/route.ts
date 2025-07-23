@@ -1,18 +1,24 @@
 import { NextRequest, NextResponse } from 'next/server';
-import mysql from 'mysql2/promise';
+import { PrismaClient } from '@/lib/generated/prisma';
+
+const prisma = new PrismaClient();
 
 export async function GET(req: NextRequest) {
   try {
-    const connection = await mysql.createConnection({
-      host: '127.0.0.1',
-      port: 3306,
-      user: 'root',
-      password: 'DevMySQL2024!',
-      database: 'gestion_affaires',
+    const dates = await prisma.affaires.findMany({
+      where: {
+        date_demande_client: { not: null }
+      },
+      select: { date_demande_client: true },
+      distinct: ['date_demande_client']
     });
-    const [rows] = await connection.execute('SELECT DISTINCT YEAR(date_demande_client) as annee FROM affaires WHERE date_demande_client IS NOT NULL ORDER BY annee ASC');
-    await connection.end();
-    const annees = (rows as any[]).map(r => r.annee?.toString()).filter(Boolean);
+    const anneesSet = new Set<string>();
+    for (const d of dates) {
+      if (d.date_demande_client) {
+        anneesSet.add(d.date_demande_client.getFullYear().toString());
+      }
+    }
+    const annees = Array.from(anneesSet).sort();
     return NextResponse.json({ success: true, annees });
   } catch (error: any) {
     return NextResponse.json({ success: false, error: error.message });
