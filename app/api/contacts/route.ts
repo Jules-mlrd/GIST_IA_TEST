@@ -91,7 +91,7 @@ export async function GET(req: Request) {
         const cached = await redis.get(cacheKey);
         if (cached) {
           try {
-            const parsed = JSON.parse(cached);
+            const parsed = JSON.parse(typeof cached === 'string' ? cached : String(cached));
             cacheTimestamp = parsed.cacheTimestamp || cacheTimestamp;
             const etag = `"${cacheTimestamp}"`;
             if (req.headers.get('if-none-match') === etag) {
@@ -103,7 +103,6 @@ export async function GET(req: Request) {
           } catch {}
         }
       }
-      // Extraction des contacts uniquement pour le dossier de l'affaire
       const prefix = `affaires/${affaire}/`;
       const [pdfFiles, txtFiles] = await Promise.all([
         listPdfFilesInS3(BUCKET_NAME),

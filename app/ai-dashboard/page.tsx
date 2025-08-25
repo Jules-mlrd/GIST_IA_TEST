@@ -12,10 +12,13 @@ import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from "@
 import { X, Plus } from "lucide-react"
 import { useSearchParams } from "next/navigation";
 import AffaireLayout from "@/components/AffaireLayout";
+import AffaireNav from "@/components/AffaireNav";
 // @ts-ignore
 import jsPDF from "jspdf";
 // @ts-ignore
 import html2canvas from "html2canvas";
+import { ChatBot } from "@/components/chatbot";
+import { useAffaireChatbot } from '@/hooks/useAffaireChatbot';
 
 ChartJS.register(BarElement, CategoryScale, LinearScale, Tooltip, Legend, PointElement, LineElement, ArcElement)
 
@@ -989,8 +992,10 @@ function UploadModal({
 
 export default function AiDashboardPage() {
   const searchParams = useSearchParams();
-  const affaire = searchParams?.get("affaire") || "";
-  const [documents, setDocuments] = useState<S3Document[]>([])
+  const affaire = searchParams.get('affaire') || '';
+  const { files: affaireFiles, loading: affaireFilesLoading } = useAffaireChatbot(affaire);
+  
+  const [documents, setDocuments] = useState<S3Document[]>([]);
   const {
     widgets,
     addWidget,
@@ -1189,9 +1194,10 @@ export default function AiDashboardPage() {
   }
 
   return (
-    <AffaireLayout numero_affaire={affaire} active="dashboard">
-      {/* TopNavBar est déjà inclus par le layout global */}
-      <header className="sticky top-0 z-30 bg-white/90 backdrop-blur flex items-center justify-between px-6 py-3 shadow-sm border-b border-gray-100 max-w-5xl mx-auto w-full">
+    <div className="w-[90vw] max-w-none mx-auto py-8 px-2 md:px-8 animate-fade-in">
+      <AffaireNav numero_affaire={affaire} active="dashboard" />
+      {/* En-tête dashboard IA */}
+      <div className="mb-10 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div className="flex items-center gap-3">
           <BarChart3 className="h-8 w-8 text-blue-600" />
           <h1 className="text-xl font-bold text-blue-900 tracking-tight">
@@ -1209,55 +1215,59 @@ export default function AiDashboardPage() {
             <HelpCircle className="h-4 w-4" /> Aide
           </Button>
         </div>
-      </header>
-      <section className="bg-blue-50/60 border-b border-blue-100 px-6 py-6 max-w-5xl mx-auto w-full">
-        <div className="max-w-3xl mx-auto text-center">
-          <h2 className="text-lg font-semibold text-blue-800 mb-2">À propos du Dashboard IA</h2>
-          <p className="text-gray-700 text-base leading-relaxed">
-            Ce tableau de bord vous permet d'analyser rapidement et intelligemment tous vos documents projet (devis, Excel, PDF, TXT, etc.) grâce à l'intelligence artificielle. Ajoutez des widgets d'analyse, sélectionnez les fichiers à traiter, et obtenez des synthèses, KPIs, alertes et graphiques pour piloter vos projets plus efficacement.
-          </p>
-        </div>
-      </section>
-      <main className="mx-auto max-w-full py-8 px-2 w-full flex flex-row justify-center">
-        <div className="flex flex-col gap-8 w-full max-w-4xl items-center mx-auto">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8 w-full">
-            <div className="flex gap-4 items-center w-full sm:w-auto">
-              <Select value={addType} onValueChange={setAddType}>
-                <SelectTrigger className="w-56 h-10 text-base">
-                  <SelectValue placeholder="Type de widget" />
-                </SelectTrigger>
-                <SelectContent>
-                  {WIDGET_TYPES.map(w => (
-                    <SelectItem key={w.value} value={w.value} className="text-base py-2">{w.label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <Button onClick={() => addWidget(addType)} variant="outline" className="flex items-center gap-1 h-10 px-6 text-base font-medium"><Plus className="h-5 w-5" /> Ajouter</Button>
-              <Button onClick={handleRefreshDocs} variant="ghost" className="flex items-center gap-1 h-10 text-base font-medium"><RefreshCw className="h-5 w-5" /> Rafraîchir</Button>
+      </div>
+      {/* Section d'intro dashboard IA */}
+      <div className="mb-10">
+        <Card className="shadow-xl border-0 bg-gradient-to-br from-white via-blue-50 to-blue-100 w-full animate-fade-in">
+          <CardContent className="p-8 flex flex-col gap-4">
+            <div className="max-w-3xl mx-auto text-center">
+              <h2 className="text-lg font-semibold text-blue-800 mb-2">À propos du Dashboard IA</h2>
+              <p className="text-gray-700 text-base leading-relaxed">
+                Ce tableau de bord vous permet d'analyser rapidement et intelligemment tous vos documents projet (devis, Excel, PDF, TXT, etc.) grâce à l'intelligence artificielle. Ajoutez des widgets d'analyse, sélectionnez les fichiers à traiter, et obtenez des synthèses, KPIs, alertes et graphiques pour piloter vos projets plus efficacement.
+              </p>
             </div>
+          </CardContent>
+        </Card>
+      </div>
+      {/* Widgets dashboard IA */}
+      <div className="flex flex-col gap-8 w-full items-center mx-auto">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8 w-full">
+          <div className="flex gap-4 items-center w-full sm:w-auto">
+            <Select value={addType} onValueChange={setAddType}>
+              <SelectTrigger className="w-56 h-10 text-base">
+                <SelectValue placeholder="Type de widget" />
+              </SelectTrigger>
+              <SelectContent>
+                {WIDGET_TYPES.map(w => (
+                  <SelectItem key={w.value} value={w.value} className="text-base py-2">{w.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Button onClick={() => addWidget(addType)} variant="outline" className="flex items-center gap-1 h-10 px-6 text-base font-medium"><Plus className="h-5 w-5" /> Ajouter</Button>
+            <Button onClick={handleRefreshDocs} variant="ghost" className="flex items-center gap-1 h-10 text-base font-medium"><RefreshCw className="h-5 w-5" /> Rafraîchir</Button>
           </div>
-          {widgets.length === 0 && (
-            <div className="flex flex-col items-center justify-center text-center text-gray-400 text-base py-24 border-2 border-dashed border-blue-100 rounded-xl bg-blue-50/40 w-full">
-              <BarChart3 className="h-14 w-14 mx-auto mb-4 text-blue-200" />
-              <span className="font-medium">Aucun widget ajouté.<br />Sélectionnez un type et cliquez sur "Ajouter" pour commencer.</span>
-            </div>
-          )}
-          {widgets.map(widget => (
+        </div>
+        {widgets.length === 0 && (
+          <div className="flex flex-col items-center justify-center text-center text-gray-400 text-base py-24 border-2 border-dashed border-blue-100 rounded-xl bg-blue-50/40 w-full">
+            <BarChart3 className="h-14 w-14 mx-auto mb-4 text-blue-200" />
+            <span className="font-medium">Aucun widget ajouté.<br />Sélectionnez un type et cliquez sur "Ajouter" pour commencer.</span>
+          </div>
+        )}
+        {widgets.map(widget => (
+          <div className="w-full" key={widget.id}>
             <WidgetCard
-              key={widget.id}
               widget={widget}
               color={getWidgetColor(widget.type)}
               label={getWidgetLabel(widget.type)}
               icon={getWidgetIcon(widget.type)}
-              docs={(() => {
-                // Utilise filteredDocuments au lieu de documents
-                if (widget.type === "global") return filteredDocuments;
-                if (widget.type === "devis") return filteredDocuments.filter(doc => doc.name.toLowerCase().includes("devis") && ["pdf","doc","docx","txt"].includes(doc.type.toLowerCase()));
-                if (widget.type === "excel") return filteredDocuments.filter(doc => ["xlsx","xls","csv"].includes(doc.type.toLowerCase()));
-                if (widget.type === "pdf") return filteredDocuments.filter(doc => doc.type.toLowerCase() === "pdf" && !doc.name.toLowerCase().includes("devis"));
-                if (widget.type === "txt") return filteredDocuments.filter(doc => doc.type.toLowerCase() === "txt");
-                return [];
-              })()}
+              docs={
+                widget.type === "global" ? filteredDocuments :
+                widget.type === "devis" ? filteredDocuments.filter(doc => doc.name.toLowerCase().includes("devis") && ["pdf","doc","docx","txt"].includes(doc.type.toLowerCase())) :
+                widget.type === "excel" ? filteredDocuments.filter(doc => ["xlsx","xls","csv"].includes(doc.type.toLowerCase())) :
+                widget.type === "pdf" ? filteredDocuments.filter(doc => doc.type.toLowerCase() === "pdf" && !doc.name.toLowerCase().includes("devis")) :
+                widget.type === "txt" ? filteredDocuments.filter(doc => doc.type.toLowerCase() === "txt") :
+                []
+              }
               sel={selections[widget.id] || []}
               res={results[widget.id]}
               isLoading={loading[widget.id]}
@@ -1269,9 +1279,9 @@ export default function AiDashboardPage() {
               onDownloadSummary={handleDownloadSummary}
               getChartData={getChartData}
             />
-          ))}
-        </div>
-      </main>
+          </div>
+        ))}
+      </div>
       <UploadModal
         show={showUpload}
         onClose={handleCloseUpload}
@@ -1285,6 +1295,10 @@ export default function AiDashboardPage() {
         setDragActive={setDragActive}
         fileInputRef={fileInputRef}
       />
-    </AffaireLayout>
+      {/* ChatBot accessible partout sur la page Dashboard IA */}
+      <div className="mt-12">
+        <ChatBot affaireId={affaire} files={affaireFiles} loading={affaireFilesLoading} />
+      </div>
+    </div>
   )
 } 

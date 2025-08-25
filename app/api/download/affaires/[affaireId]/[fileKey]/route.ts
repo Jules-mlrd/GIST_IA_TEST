@@ -2,8 +2,8 @@ import { NextRequest } from 'next/server';
 import s3 from '@/lib/s3Client';
 import { GetObjectCommand } from '@aws-sdk/client-s3';
 
-export async function GET(req: NextRequest, { params }: { params: { affaireId: string, fileKey: string } }) {
-  const { affaireId, fileKey } = params;
+export async function GET(req: NextRequest, { params }: { params: Promise<{ affaireId: string, fileKey: string }> }) {
+  const { affaireId, fileKey } = await params;
   const bucket = process.env.AWS_BUCKET_NAME || '';
   if (!bucket) return new Response('AWS_BUCKET_NAME manquant', { status: 500 });
   try {

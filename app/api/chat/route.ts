@@ -88,6 +88,7 @@ async function resolveImplicitReferences(userId: string, message: string): Promi
 }
 
 function isMemoryResetCommand(message: string) {
+  if (typeof message !== 'string') return false;
   return /^(reset|clear) (memory|context|state)$/i.test(message.trim());
 }
 
@@ -100,11 +101,69 @@ function detectSummaryIntent(message: string) {
   return keywords.some((kw) => lowerMsg.includes(kw));
 }
 
+// Nouvelle fonction pour détecter le type de question et adapter la réponse
+function detectQuestionType(message: string): { type: string, context: string } {
+  const lowerMsg = message.toLowerCase();
+  
+  // Questions sur les risques
+  if (lowerMsg.includes('risque') || lowerMsg.includes('danger') || lowerMsg.includes('problème') || lowerMsg.includes('alerte')) {
+    return { type: 'risk_analysis', context: 'Analyse de risques et points d\'attention' };
+  }
+  
+  // Questions sur les coûts/budgets
+  if (lowerMsg.includes('coût') || lowerMsg.includes('prix') || lowerMsg.includes('budget') || lowerMsg.includes('montant') || lowerMsg.includes('devis')) {
+    return { type: 'cost_analysis', context: 'Analyse financière et budgétaire' };
+  }
+  
+  // Questions sur les délais/planning
+  if (lowerMsg.includes('délai') || lowerMsg.includes('date') || lowerMsg.includes('planning') || lowerMsg.includes('échéance') || lowerMsg.includes('calendrier')) {
+    return { type: 'timeline_analysis', context: 'Analyse des délais et planning' };
+  }
+  
+  // Questions sur les personnes/contacts
+  if (lowerMsg.includes('qui') || lowerMsg.includes('contact') || lowerMsg.includes('personne') || lowerMsg.includes('responsable') || lowerMsg.includes('référent')) {
+    return { type: 'contact_analysis', context: 'Identification des parties prenantes' };
+  }
+  
+  // Questions techniques
+  if (lowerMsg.includes('technique') || lowerMsg.includes('spécification') || lowerMsg.includes('méthode') || lowerMsg.includes('procédure')) {
+    return { type: 'technical_analysis', context: 'Analyse technique et méthodologique' };
+  }
+  
+  // Questions de comparaison
+  if (lowerMsg.includes('comparer') || lowerMsg.includes('différence') || lowerMsg.includes('similaire') || lowerMsg.includes('versus')) {
+    return { type: 'comparison_analysis', context: 'Analyse comparative' };
+  }
+  
+  return { type: 'general', context: 'Analyse générale' };
+}
+
 const SYSTEM_PROMPT = `
-Vous êtes un assistant IA expert en compréhension et synthèse de documents.
-Votre objectif est d'aider l'utilisateur à comprendre, résumer ou extraire les points clés d'un document,
-en répondant toujours de façon claire, concise et pédagogique, sans jamais restituer le document complet.
-Si l'utilisateur demande un résumé, une explication ou les points clés, fournissez une synthèse structurée et accessible.
+Vous êtes un assistant IA spécialisé dans la gestion de projets SNCF et l'analyse de documents techniques.
+
+CONTEXTE MÉTIER SNCF :
+- Vous travaillez dans un environnement de gestion de projets ferroviaires
+- Vous connaissez les termes techniques : affaires, devis, notes de travaux, risques, contacts MOA, etc.
+- Vous comprenez les enjeux de sécurité, de réglementation et de maintenance ferroviaire
+- Vous savez identifier les parties prenantes : clients, porteurs, référents, contacts MOA
+
+RÈGLES DE RÉPONSE :
+1. Répondez de façon précise et adaptée au contexte SNCF
+2. Structurez vos réponses avec des points clés quand c'est pertinent
+3. Identifiez les risques, alertes ou points d'attention importants
+4. Mentionnez les dates, montants, personnes et références techniques
+5. Si vous n'avez pas assez d'information, demandez des précisions
+6. Évitez les réponses génériques - soyez spécifique au contexte
+7. Utilisez un ton professionnel mais accessible
+
+TYPES DE QUESTIONS FRÉQUENTES :
+- Résumés de documents : synthétisez les points essentiels
+- Analyse de risques : identifiez les dangers et recommandations
+- Comparaisons : mettez en évidence les différences et similitudes
+- Recherche d'informations : localisez et extrayez les données demandées
+- Questions techniques : expliquez avec précision les aspects techniques
+
+IMPORTANT : Adaptez toujours votre réponse au type de document (devis, note de travaux, rapport technique, etc.) et au contexte de l'affaire.
 `;
 
 const conversationContext: Record<string, { lastDoc?: string, lastTxt?: string }> = {};
@@ -282,7 +341,7 @@ async function getOrCacheDocumentAnalysis(bucketName: string, fileKey: string, t
 }
 
 // --- Ajout pour la mise en cache des réponses IA ---
-async function getSimilarCachedResponse(userId: string, message: string, threshold = 0.9) {
+async function getSimilarCachedResponse(userId: string, message: string, threshold = 0.85) {
   const cacheKey = `user:${userId}:qa-history`;
   let history = await getCache(cacheKey);
   if (!history) return null;
@@ -315,11 +374,90 @@ async function cacheUserResponse(userId: string, message: string, embedding: num
   await setCache(cacheKey, history, 60 * 60 * 24); // 24h TTL
 }
 
+const getChatKey = (affaireId: string) => `chat:affaire:${affaireId}`;
+
+// Fonction utilitaire pour sauvegarder les messages dans Redis
+async function saveToRedisHistory(affaireId: string, userMessage: string, botReply: string) {
+  if (!affaireId) return;
+  const key = getChatKey(affaireId);
+  console.log('saveToRedisHistory - Clé:', key);
+  const existingHistory = await redis.get(key);
+  let history = [];
+  try {
+    history = existingHistory ? JSON.parse(existingHistory) : [];
+  } catch {}
+  
+  console.log('saveToRedisHistory - Historique existant:', history);
+  
+  // Ajouter le message utilisateur et la réponse IA
+  const userMsg = {
+    id: `user-${Date.now()}`,
+    content: userMessage,
+    sender: "user",
+    timestamp: new Date().toISOString()
+  };
+  const botMsg = {
+    id: `bot-${Date.now()}`,
+    content: botReply,
+    sender: "bot",
+    timestamp: new Date().toISOString()
+  };
+  
+  history.push(userMsg);
+  history.push(botMsg);
+  
+  console.log('saveToRedisHistory - Nouvel historique:', history);
+  
+  await redis.set(key, JSON.stringify(history), { ex: 60 * 60 * 24 * 7 }); // 7 jours
+  console.log('saveToRedisHistory - Sauvegarde terminée');
+}
+
+export async function GET(req: Request) {
+  const url = new URL(req.url || '', 'http://localhost');
+  const affaireId = url.searchParams.get('affaireId');
+  if (!affaireId) return NextResponse.json({ error: 'affaireId requis' }, { status: 400 });
+  const key = getChatKey(affaireId);
+  console.log('API GET - Clé Redis:', key);
+  const history = await redis.get(key);
+  console.log('API GET - Données brutes Redis:', history);
+  try {
+    // Redis retourne déjà des objets, pas des chaînes JSON
+    const parsedHistory = Array.isArray(history) ? history : [];
+    console.log('API GET - Historique parsé:', parsedHistory);
+    return NextResponse.json({ history: parsedHistory });
+  } catch (error) {
+    console.error('API GET - Erreur parsing:', error);
+    return NextResponse.json({ history: [] });
+  }
+}
+
+
+
+export async function DELETE(req: Request) {
+  const url = new URL(req.url || '', 'http://localhost');
+  const affaireId = url.searchParams.get('affaireId');
+  if (!affaireId) return NextResponse.json({ error: 'affaireId requis' }, { status: 400 });
+  const key = getChatKey(affaireId);
+  await redis.del(key);
+  return NextResponse.json({ success: true });
+}
+
 export async function POST(req: Request) {
   const endpoint = 'api:chat';
   const start = Date.now();
   try {
     const { message, userId = "default", affaireId, readFiles = true, contextFiles } = await req.json();
+    
+    // Debug: Log des fichiers sélectionnés
+    console.log('Fichiers sélectionnés reçus:', contextFiles);
+    console.log('Type de contextFiles:', typeof contextFiles);
+    console.log('Est un array:', Array.isArray(contextFiles));
+    
+    // Ensure message is a string
+    if (typeof message !== 'string') {
+      return NextResponse.json({ reply: 'Le message doit être une chaîne de caractères.' }, { status: 400 });
+    }
+    
     if (isMemoryResetCommand(message)) {
       clearMemory(userId);
       return NextResponse.json({ reply: "La mémoire de la session a été réinitialisée." });
@@ -375,7 +513,7 @@ export async function POST(req: Request) {
       const lower = text.toLowerCase();
       return mailWritingKeywords.some(kw => lower.includes(kw));
     }
-    // On ne déclenche la réponse contact que si ce n'est PAS une demande de rédaction de mail
+    // On ne déclenche la réponse contact que si ce n'est PAS une demande de rédaction de mail ET qu'aucun fichier n'est sélectionné
     const isContactIntent = (
       !isMailWritingIntent(typeof message === 'string' ? message : '') &&
       !isMailWritingIntent(typeof intentEntities.intent === 'string' ? intentEntities.intent : '') &&
@@ -384,7 +522,13 @@ export async function POST(req: Request) {
         contactKeywords.some(kw => (typeof message === 'string' ? message : '').toLowerCase().includes(kw))
       )
     );
-    if (isContactIntent && affaireId) {
+    
+    // Vérifier d'abord si des fichiers sont sélectionnés - si oui, on ignore la logique de contact automatique
+    const hasContextFiles = Array.isArray(contextFiles) && contextFiles.length > 0;
+    
+    // Ne déclencher la réponse contact automatique que si aucun fichier n'est sélectionné
+    console.log('Détection contact:', { isContactIntent, hasContextFiles, contextFiles });
+    if (isContactIntent && affaireId && !hasContextFiles) {
       // Récupérer les infos de l'affaire
       const affaire = await prisma.affaires.findFirst({ where: { numero_affaire: affaireId } });
       if (affaire) {
@@ -398,9 +542,12 @@ export async function POST(req: Request) {
           contactMsg = `Aucun contact spécifique n'est renseigné pour cette affaire.`;
         }
         memory.history.push({ role: "assistant", content: contactMsg });
+        await saveToRedisHistory(affaireId, message, contactMsg);
         return NextResponse.json({ reply: contactMsg });
       } else {
-        return NextResponse.json({ reply: "Aucune information d'affaire trouvée pour fournir un contact." });
+        const errorMsg = "Aucune information d'affaire trouvée pour fournir un contact.";
+        await saveToRedisHistory(affaireId, message, errorMsg);
+        return NextResponse.json({ reply: errorMsg });
       }
     }
     if (intentEntities.entities?.some(e => e.type === 'file' || e.type === 'document')) {
@@ -487,7 +634,9 @@ export async function POST(req: Request) {
       memory.keyEntities = keyEntities;
     }
     if (isAmbiguousIntent(message, intentEntities.intent)) {
-      return NextResponse.json({ reply: "Votre question semble ambiguë ou fait référence à un élément précédent. Pouvez-vous préciser de quel document, projet ou sujet il s'agit ?" });
+      const ambiguousReply = "Votre question semble ambiguë ou fait référence à un élément précédent. Pouvez-vous préciser de quel document, projet ou sujet il s'agit ?";
+      await saveToRedisHistory(affaireId, message, ambiguousReply);
+      return NextResponse.json({ reply: ambiguousReply });
     }
     let multiFiles: (FileReference & { activeCount?: number })[] = [];
     if (intentEntities.entities) {
@@ -527,6 +676,7 @@ export async function POST(req: Request) {
     let semanticContext = '';
     let contextFilesText = '';
     if (Array.isArray(contextFiles) && contextFiles.length > 0) {
+      console.log('Traitement des fichiers sélectionnés:', contextFiles);
       // Charger uniquement les fichiers explicitement sélectionnés
       for (const fileKey of contextFiles) {
         let text = '';
@@ -539,6 +689,9 @@ export async function POST(req: Request) {
           contextFilesText += `\n\n---\nContenu du fichier ${fileKey}:\n${text}`;
         }
       }
+      
+
+      
       // Ajout : on lit aussi la base de données (recherche sémantique)
       if (affaireId) {
         semanticResults = await semanticSearchInIndexedFiles(message, affaireId);
@@ -559,18 +712,36 @@ export async function POST(req: Request) {
         semanticContext = semanticResults.map(r => `Extrait pertinent du fichier ${r.file} :\n${r.passage}`).join('\n\n');
       }
     }
-    // Détection d'intention : résumé ou demande sur fichier joint
+    // Détection d'intention améliorée pour différents types de requêtes
     const resumeIntentRegex = /résum[ée]|synth[èe]se|extrait|points? clés?|fichier joint|document sélectionné|document joint|fichier sélectionné|ce fichier|ces fichiers|le fichier|les fichiers|document/i;
     const isResumeIntent = resumeIntentRegex.test(message);
+    
+    // Détection d'autres types de requêtes
+    const analysisIntentRegex = /analys[ée]|étudier|examiner|vérifier|contrôler|rechercher|trouver|identifier|détecter|comparer|différence|similaire/i;
+    const isAnalysisIntent = analysisIntentRegex.test(message);
+    
+    const questionIntentRegex = /qu[ée]stion|demande|comment|pourquoi|quand|où|qui|quoi|combien|quel|quelle|quels|quelles/i;
+    const isQuestionIntent = questionIntentRegex.test(message);
+    
+    // Détection de requête sur fichier spécifique
+    const fileSpecificIntent = /fichier|document|pièce jointe|joint|sélectionné|ce document|ce fichier|le document|le fichier/i;
+    const isFileSpecificIntent = fileSpecificIntent.test(message);
+    
+    // Déterminer le type principal de requête
+    let requestType = 'general';
+    if (isResumeIntent) requestType = 'summary';
+    else if (isAnalysisIntent) requestType = 'analysis';
+    else if (isQuestionIntent) requestType = 'question';
+    else if (isFileSpecificIntent) requestType = 'file_specific';
     // Si la demande concerne un fichier joint/document sélectionné
     // Gestion des cas multiples/ambigus
     let ambiguousWarning = '';
-    if (isResumeIntent && Array.isArray(contextFiles) && contextFiles.length > 1) {
-      ambiguousWarning = "Plusieurs fichiers ont été sélectionnés. Propose un résumé global ou un résumé pour chaque fichier, ou demande à l'utilisateur de préciser si besoin.";
+    if ((isResumeIntent || isAnalysisIntent || isFileSpecificIntent) && Array.isArray(contextFiles) && contextFiles.length > 1) {
+      ambiguousWarning = "Plusieurs fichiers ont été sélectionnés. Propose une analyse globale ou une analyse pour chaque fichier, ou demande à l'utilisateur de préciser si besoin.";
     }
     // Gestion des erreurs de lecture de fichiers
     let fileErrorWarning = '';
-    if (isResumeIntent && Array.isArray(contextFiles) && contextFiles.length > 0) {
+    if ((isResumeIntent || isAnalysisIntent || isFileSpecificIntent) && Array.isArray(contextFiles) && contextFiles.length > 0) {
       for (const fileKey of contextFiles) {
         let text = '';
         let error = '';
@@ -615,7 +786,7 @@ export async function POST(req: Request) {
         body: JSON.stringify({
           model: 'gpt-3.5-turbo',
           messages: openaiMessages,
-          temperature: 0.7,
+          temperature: 0.3,
           max_tokens: 4096,
         }),
       });
@@ -636,7 +807,12 @@ export async function POST(req: Request) {
       return NextResponse.json({ reply, explicabilityBelow: explicability });
     }
     // Après la gestion des fichiers sélectionnés et avant la construction du prompt openaiMessages :
-    if (isResumeIntent && (!Array.isArray(contextFiles) || contextFiles.length === 0)) {
+    // Si des fichiers sont sélectionnés, on a déjà traité la demande plus haut
+    // Sinon, vérifier si c'est une demande de résumé global d'affaire
+    const hasSelectedFiles = Array.isArray(contextFiles) && contextFiles.length > 0;
+    
+    // Si aucun fichier sélectionné ET que ce n'est pas une demande de fichier spécifique
+    if (!hasSelectedFiles && !isFileSpecificIntent) {
       // Résumé global si semanticContext existe, sinon demande de précision
       if (affaireId) {
         // Lire l'affaire depuis la base
@@ -657,7 +833,7 @@ export async function POST(req: Request) {
             body: JSON.stringify({
               model: 'gpt-3.5-turbo',
               messages: openaiMessages,
-              temperature: 0.7,
+              temperature: 0.3,
               max_tokens: 4096,
             }),
           });
@@ -692,7 +868,7 @@ export async function POST(req: Request) {
           body: JSON.stringify({
             model: 'gpt-3.5-turbo',
             messages: openaiMessages,
-            temperature: 0.7,
+            temperature: 0.3,
             max_tokens: 4096,
           }),
         });
@@ -712,18 +888,42 @@ export async function POST(req: Request) {
         };
         return NextResponse.json({ reply, explicabilityBelow: explicability });
       } else {
-        return NextResponse.json({ reply: "Pour quel(s) fichier(s) souhaitez-vous un résumé ? Veuillez sélectionner un ou plusieurs fichiers ou préciser votre demande." });
+        let precisionReply = "";
+        if (requestType === 'summary') {
+          precisionReply = "Pour quel(s) fichier(s) souhaitez-vous un résumé ? Veuillez sélectionner un ou plusieurs fichiers ou préciser votre demande.";
+        } else if (requestType === 'analysis') {
+          precisionReply = "Pour quel(s) fichier(s) souhaitez-vous une analyse ? Veuillez sélectionner un ou plusieurs fichiers ou préciser votre demande.";
+        } else if (requestType === 'question') {
+          precisionReply = "Sur quel(s) fichier(s) souhaitez-vous que je réponde à votre question ? Veuillez sélectionner un ou plusieurs fichiers.";
+        } else if (requestType === 'file_specific') {
+          precisionReply = "Quel(s) fichier(s) souhaitez-vous que j'examine ? Veuillez sélectionner un ou plusieurs fichiers.";
+        } else {
+          precisionReply = "Sur quel(s) fichier(s) souhaitez-vous que je travaille ? Veuillez sélectionner un ou plusieurs fichiers ou préciser votre demande.";
+        }
+        await saveToRedisHistory(affaireId, message, precisionReply);
+        return NextResponse.json({ reply: precisionReply });
       }
     }
+    
+    // Si c'est une demande de fichier spécifique mais aucun fichier sélectionné
+    if (isFileSpecificIntent && !hasSelectedFiles) {
+      let precisionReply = "Quel(s) fichier(s) souhaitez-vous que j'examine ? Veuillez sélectionner un ou plusieurs fichiers.";
+      await saveToRedisHistory(affaireId, message, precisionReply);
+      return NextResponse.json({ reply: precisionReply });
+    }
+    // Détecter le type de question pour adapter la réponse
+    const questionType = detectQuestionType(resolvedMessage);
+    
     const openaiMessages = [
       { role: "system", content: SYSTEM_PROMPT + contactContext },
+      { role: "system", content: `Type de question détecté : ${questionType.type}. Contexte : ${questionType.context}. Adaptez votre réponse en conséquence.` },
       memory.contextSummary ? { role: "system", content: `Résumé du contexte : ${memory.contextSummary}` } : undefined,
       contextFilesText ? { role: "system", content: `Contexte extrait des fichiers sélectionnés :\n${contextFilesText}` } : undefined,
       semanticContext ? { role: "system", content: `Contexte extrait par recherche sémantique :\n${semanticContext}` } : undefined,
       memory.userGoals && memory.userGoals.length ? { role: "system", content: `Objectifs utilisateur détectés : ${memory.userGoals.join(", ")}` } : undefined,
       memory.keyEntities && memory.keyEntities.length ? { role: "system", content: `Entités clés détectées : ${memory.keyEntities.map(e => `${e.type}: ${e.value}`).join("; ")}` } : undefined,
-      // Limiter l'historique à 10 derniers messages pertinents
-      ...memory.history.slice(-10)
+      // Limiter l'historique à 15 derniers messages pertinents pour plus de contexte
+      ...memory.history.slice(-15)
         .filter((m): m is { role: "user" | "assistant"; content: string } => !!m && (m.role === "user" || m.role === "assistant") && typeof m.content === 'string')
         .map(m => ({
           role: m.role === "assistant" ? "assistant" : "user",
@@ -804,7 +1004,7 @@ export async function POST(req: Request) {
       body: JSON.stringify({
         model: 'gpt-3.5-turbo',
         messages: openaiMessages,
-        temperature: 0.7,
+        temperature: 0.3,
         max_tokens: 4096,
       }),
     });
@@ -816,6 +1016,9 @@ export async function POST(req: Request) {
     const reply = data.choices?.[0]?.message?.content || "Aucune réponse générée.";
     memory.history.push({ role: "assistant", content: reply });
     await updateMemory(userId, memory);
+
+    // Sauvegarder aussi dans Redis pour l'API GET
+    await saveToRedisHistory(affaireId, message, reply);
 
     let contextForSuggestions = '';
     if (memory.contextSummary) contextForSuggestions += `Résumé du contexte : ${memory.contextSummary}\n`;

@@ -5,7 +5,6 @@ import s3 from '@/lib/s3Client';
 import redis from '@/lib/redisClient';
 
 async function extractDocxTextFromS3(bucket: string, key: string): Promise<string> {
-  // TODO: Utiliser une lib type mammoth pour extraire le texte du buffer
   return '[Extraction DOCX non implémentée]';
 }
 
@@ -26,8 +25,8 @@ async function getEmbeddingOpenAI(text: string): Promise<number[]> {
   return data.data[0].embedding;
 }
 
-export async function POST(req: NextRequest, context: { params: { affaireId: string } }) {
-  const { affaireId } = context.params;
+export async function POST(req: NextRequest, context: { params: Promise<{ affaireId: string }> }) {
+  const { affaireId } = await context.params;
   const bucket = process.env.AWS_BUCKET_NAME || '';
   if (!bucket) return NextResponse.json({ error: 'AWS_BUCKET_NAME manquant' }, { status: 500 });
   try {

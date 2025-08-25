@@ -25,8 +25,8 @@ async function getEmbeddingOpenAI(text: string): Promise<number[]> {
   return data.data[0].embedding;
 }
 
-export async function POST(req: NextRequest, { params }: { params: { affaireId: string } }) {
-  const affaireId = params.affaireId;
+export async function POST(req: NextRequest, { params }: { params: Promise<{ affaireId: string }> }) {
+  const { affaireId } = await params;
   try {
     const { query } = await req.json();
     if (!query) return NextResponse.json({ error: 'Query manquante.' }, { status: 400 });

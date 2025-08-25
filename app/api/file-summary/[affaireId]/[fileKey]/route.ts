@@ -33,8 +33,8 @@ async function summarizeWithOpenAI(text: string): Promise<string> {
   return data.choices?.[0]?.message?.content || '';
 }
 
-export async function GET(req: NextRequest, { params }: { params: { affaireId: string, fileKey: string } }) {
-  const { affaireId, fileKey } = params;
+export async function GET(req: NextRequest, { params }: { params: Promise<{ affaireId: string, fileKey: string }> }) {
+  const { affaireId, fileKey } = await params;
   const bucket = process.env.AWS_BUCKET_NAME || '';
   if (!bucket) return NextResponse.json({ error: 'AWS_BUCKET_NAME manquant' }, { status: 500 });
   try {

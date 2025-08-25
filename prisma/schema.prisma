@@ -34,6 +34,8 @@ model affaires {
   reference_client         String?
   s3_folder                String?
   client                   String?
+  fournisseur              String?
+  secteur                  String?
   guichet                  String?
   contact_moa_moeg         String?
   communication_client     String?
@@ -110,4 +112,17 @@ model budget {
   type_de_compte String?
   affaire_id     Int?
   affaires       affaires? @relation(fields: [affaire_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+model risque {
+  id           Int      @id @default(autoincrement())
+  description  String
+  criticite    String?
+  justification String?
+  responsable  String?
+  action       String?
+  affaire_id   Int
+  affaires     affaires @relation(fields: [affaire_id], references: [id], onDelete: Cascade)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 }

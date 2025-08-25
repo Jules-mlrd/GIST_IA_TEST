@@ -108,12 +108,6 @@ export default function AffaireFilesClient({ numero_affaire }: { numero_affaire:
       <h2 className="text-lg font-semibold mb-4">Fichiers de l'affaire</h2>
       <FileUploadForm numero_affaire={numero_affaire} onUploaded={fetchFiles} />
       {loading ? <div>Chargement...</div> : <FileList files={files} />}
-      <div className="mt-8">
-        <h3 className="text-base font-semibold mb-2 text-sncf-red flex items-center gap-2">
-          <span>Assistant IA GIST</span>
-        </h3>
-        <ChatBot affaireId={numero_affaire} files={files} loading={loading} />
-      </div>
     </div>
   );
 } 

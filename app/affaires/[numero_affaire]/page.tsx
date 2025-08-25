@@ -10,8 +10,8 @@ async function fetchAffaire(numero_affaire: string) {
   return res.json();
 }
 
-export default async function AffaireDetailPage({ params }: { params: { numero_affaire: string } }) {
-  const { numero_affaire } = params;
+export default async function AffaireDetailPage({ params }: { params: Promise<{ numero_affaire: string }> }) {
+  const { numero_affaire } = await params;
   const data = await fetchAffaire(numero_affaire);
   if (!data.success) return notFound();
   const affaire = data.affaire;

@@ -1,24 +1,24 @@
 [
   {
-    "description": "Retard potentiel de livraison des travaux réseau de la salle de formation",
+    "description": "Retard potentiel de livraison des travaux réseau",
     "criticite": "moyen",
-    "justification": "Le retard est possible et pourrait impacter le planning.",
-    "responsable": "Service TC PARIS AUSTERLITZ",
-    "action": "Suivre de près l'avancement des travaux et anticiper les retards éventuels."
+    "justification": "Le retard est possible et pourrait impacter le planning du projet.",
+    "responsable": "Service Achats",
+    "action": "Suivre de près l'avancement des travaux et anticiper les retards éventuels"
+  },
+  {
+    "description": "Non-respect des horaires de livraison",
+    "criticite": "faible",
+    "justification": "Impact limité sur le projet, mais peut entraîner des désagréments logistiques.",
+    "responsable": "Service Logistique",
+    "action": "Rappeler les horaires de livraison au fournisseur et prévoir des solutions de secours"
   },
   {
     "description": "Non-respect du délai de paiement des factures",
     "criticite": "élevé",
-    "justification": "Le non-respect peut entraîner des retards de paiement et des complications financières.",
-    "responsable": "Service Finances SNCF VOYAGEURS",
-    "action": "Mettre en place un suivi rigoureux des échéances de paiement et des envois de factures."
-  },
-  {
-    "description": "Difficultés potentielles liées à la facturation électronique",
-    "criticite": "moyen",
-    "justification": "Les fournisseurs pourraient rencontrer des problèmes techniques ou de compréhension.",
-    "responsable": "Service Achats SNCF VOYAGEURS",
-    "action": "Proposer une assistance et une formation aux fournisseurs pour faciliter la transition vers la facturation électronique."
+    "justification": "Peut entraîner des pénalités financières et des retards dans le traitement des fournisseurs.",
+    "responsable": "Service Financier",
+    "action": "Mettre en place un suivi rigoureux des échéances de paiement et des envois de factures"
   },
   {
     "description": "Retard de transmission du formulaire CAC complété",
@@ -28,38 +28,17 @@
     "action": "Relancer le destinataire pour obtenir le formulaire complété"
   },
   {
-    "description": "Retard dans l'ouverture de l'affaire pour les travaux réseau",
+    "description": "Dépendance à la réception du formulaire CAC pour lancer les travaux",
     "criticite": "élevé",
-    "justification": "Un retard dans l'ouverture de l'affaire peut retarder l'avancement des travaux.",
-    "responsable": "Responsable d'affaire SNCF RESEAU Dg idf / DZP IDF",
-    "action": "Suivre de près le processus d'ouverture de l'affaire"
+    "justification": "Le formulaire est une étape cruciale pour lancer les travaux, tout retard peut impacter le planning.",
+    "responsable": "Cellule Accueil Clients GRTI IDF",
+    "action": "Mettre en place un suivi rigoureux des demandes de formulaire"
   },
   {
-    "description": "Dépendance à la disponibilité du client pour l'ouverture de l'affaire",
+    "description": "Erreur de transmission des informations du client pour l'ouverture de l'affaire",
     "criticite": "moyen",
-    "justification": "Le projet est bloqué en attente de la disponibilité du client pour l'ouverture de l'affaire.",
-    "responsable": "Responsable d'affaire SNCF RESEAU Dg idf / DZP IDF",
-    "action": "Communiquer clairement les attentes au client et planifier une réunion pour avancer"
-  },
-  {
-    "description": "Erreur potentielle dans la création de l'affaire",
-    "criticite": "moyen",
-    "justification": "Une erreur dans la création de l'affaire peut entraîner des confusions ou des retards.",
+    "justification": "Une erreur dans les informations du client peut retarder le traitement de l'affaire.",
     "responsable": "Assistant Travaux Nord Ligne C - UP Télécom PRG",
-    "action": "Vérifier attentivement les informations lors de la création de l'affaire"
-  },
-  {
-    "description": "Retard possible dans l'attribution de la demande de travaux",
-    "criticite": "moyen",
-    "justification": "Un retard dans l'attribution peut entraîner des retards dans la planification des travaux.",
-    "responsable": "Responsable d'affaire SNCF RESEAU Dg idf / DZP IDF",
-    "action": "Attribuer rapidement la demande à l'intervenant approprié"
-  },
-  {
-    "description": "Risque de non-respect des délais de réalisation des travaux",
-    "criticite": "élevé",
-    "justification": "Les retards accumulés dans les étapes précédentes peuvent impacter les délais de réalisation des travaux.",
-    "responsable": "Responsable d'affaire SNCF RESEAU Dg idf / DZP IDF",
-    "action": "Mettre en place un suivi régulier des étapes pour éviter les retards"
+    "action": "Vérifier et valider les informations du client avant l'ouverture de l'affaire"
   }
 ]

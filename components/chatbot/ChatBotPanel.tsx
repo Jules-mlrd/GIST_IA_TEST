@@ -66,6 +66,14 @@ function markdownToCleanHtml(md: string): string {
   return html;
 }
 
+function formatFileSize(bytes: number) {
+  if (bytes === 0) return '0 KB';
+  const k = 1024;
+  const sizes = ['KB', 'MB', 'GB', 'TB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+}
+
 const ChatBotPanel: React.FC<Props & {
   readFiles: boolean;
   onToggleReadFiles: () => void;
@@ -153,7 +161,7 @@ const ChatBotPanel: React.FC<Props & {
             onClick={onClose}
           />
           <motion.div
-            className="fixed right-0 bottom-0 top-0 w-full max-w-md z-50 flex flex-col h-full bg-white rounded-3xl shadow-2xl border border-sncf-red animate-fade-in"
+            className="fixed right-0 bottom-0 top-0 w-full max-w-md z-50 flex flex-col h-full bg-white dark:bg-gray-800 rounded-3xl shadow-2xl border border-sncf-red dark:border-gray-600 animate-fade-in"
             initial={{ x: 400, opacity: 0 }}
             animate={{ x: 0, opacity: 1 }}
             exit={{ x: 400, opacity: 0 }}
@@ -175,27 +183,27 @@ const ChatBotPanel: React.FC<Props & {
                   </button>
                   {menuOpen && (
                     <div
-                      className="absolute right-0 mt-2 w-56 bg-gray-50 border border-gray-300 rounded-xl shadow-xl z-50 animate-fade-in text-gray-800"
+                      className="absolute right-0 mt-2 w-56 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-xl shadow-xl z-50 animate-fade-in text-gray-800 dark:text-gray-200"
                       onClick={e => e.stopPropagation()}
                     >
-                      <button className="w-full text-left px-4 py-2 hover:bg-gray-200 rounded-t-xl flex items-center gap-2" onClick={() => setShowPrefs(true)}>
+                      <button className="w-full text-left px-4 py-2 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-t-xl flex items-center gap-2" onClick={() => setShowPrefs(true)}>
                         <Settings className="h-4 w-4" /> Préférences
                       </button>
-                      <button className="w-full text-left px-4 py-2 hover:bg-gray-200" onClick={() => { setMenuOpen(false); /* TODO: exporter */ }}>Exporter la conversation</button>
-                      <button className="w-full text-left px-4 py-2 hover:bg-gray-200 rounded-b-xl" onClick={() => { setMenuOpen(false); /* TODO: copier */ }}>Copier la conversation</button>
+                      <button className="w-full text-left px-4 py-2 hover:bg-gray-200 dark:hover:bg-gray-600" onClick={() => { setMenuOpen(false); /* TODO: exporter */ }}>Exporter la conversation</button>
+                      <button className="w-full text-left px-4 py-2 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-b-xl" onClick={() => { setMenuOpen(false); /* TODO: copier */ }}>Copier la conversation</button>
                     </div>
                   )}
                   {showPrefs && (
                     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
-                      <div className="bg-white rounded-2xl shadow-xl p-6 w-full max-w-xs relative">
+                      <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-6 w-full max-w-xs relative">
                         <button className="absolute top-2 right-2 p-2" onClick={() => setShowPrefs(false)}><X className="h-5 w-5" /></button>
-                        <h3 className="font-bold text-lg mb-4">Préférences</h3>
+                        <h3 className="font-bold text-lg mb-4 text-gray-900 dark:text-white">Préférences</h3>
                         <div className="flex flex-col gap-4">
-                          <label className="flex items-center gap-2">
+                          <label className="flex items-center gap-2 text-gray-700 dark:text-gray-300">
                             <input type="checkbox" checked={userPrefs?.readFiles} onChange={e => onPrefChange && onPrefChange('readFiles', e.target.checked)} />
                             <span>Activer la lecture des fichiers S3</span>
                           </label>
-                          <label className="flex items-center gap-2">
+                          <label className="flex items-center gap-2 text-gray-700 dark:text-gray-300">
                             <input type="checkbox" checked={userPrefs?.showPromptByDefault} onChange={e => onPrefChange && onPrefChange('showPromptByDefault', e.target.checked)} />
                             <span>Afficher le prompt IA par défaut</span>
                           </label>
@@ -213,14 +221,59 @@ const ChatBotPanel: React.FC<Props & {
               </div>
             </div>
             {summary && (
-              <div className="px-6 py-3 border-b bg-gray-50 text-sm text-gray-700">
+              <div className="px-6 py-3 border-b bg-gray-50 dark:bg-gray-700 text-sm text-gray-700 dark:text-gray-300">
                 {summary}
               </div>
             )}
             <div
-              className="flex-1 min-h-0 overflow-y-auto py-6 px-4 pb-36 bg-white rounded-xl border border-gray-200 shadow-lg scrollbar-thin scrollbar-thumb-sncf-red/60 scrollbar-track-gray-100 border-dashed border-2 border-blue-200"
+              className="flex-1 min-h-0 overflow-y-auto py-6 px-4 pb-36 bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-600 shadow-lg scrollbar-thin scrollbar-thumb-sncf-red/60 scrollbar-track-gray-100 dark:scrollbar-track-gray-700 border-dashed border-2 border-blue-200 dark:border-blue-700"
               style={{ WebkitOverflowScrolling: 'touch' }}
             >
+              {/* Indicateur des fichiers joints */}
+              {contextFiles.length > 0 && (
+                <div className="mb-4 p-3 bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-700 rounded-lg">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Paperclip className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                    <span className="text-sm font-medium text-blue-800 dark:text-blue-200">
+                      {contextFiles.length} fichier{contextFiles.length > 1 ? 's' : ''} joint{contextFiles.length > 1 ? 's' : ''} à la conversation
+                    </span>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {contextFiles.map(key => {
+                      const file = files.find(f => f.key === key);
+                      return (
+                        <div key={key} className="flex items-center gap-1 bg-white dark:bg-gray-700 border border-blue-300 dark:border-blue-600 rounded-full px-2 py-1 text-xs">
+                          <FileText className="h-3 w-3 text-blue-600 dark:text-blue-400" />
+                          <span className="text-blue-700 dark:text-blue-300 truncate max-w-32">{file ? file.name : key}</span>
+                          {onRemoveContextFile && (
+                            <button 
+                              onClick={() => onRemoveContextFile(key)}
+                              className="ml-1 p-0.5 hover:bg-red-100 dark:hover:bg-red-900/30 rounded-full"
+                            >
+                              <X className="h-3 w-3 text-red-500" />
+                            </button>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+              
+              {/* Message d'aide si aucun fichier joint */}
+              {contextFiles.length === 0 && messages.length === 0 && (
+                <div className="mb-4 p-4 bg-yellow-50 dark:bg-yellow-900/30 border border-yellow-200 dark:border-yellow-700 rounded-lg">
+                  <div className="flex items-center gap-2 mb-2">
+                    <FileText className="h-4 w-4 text-yellow-600 dark:text-yellow-400" />
+                    <span className="text-sm font-medium text-yellow-800 dark:text-yellow-200">Conseil</span>
+                  </div>
+                  <p className="text-sm text-yellow-700 dark:text-yellow-300">
+                    Pour analyser un fichier spécifique, cliquez sur "Joindre des fichiers" en haut à droite, 
+                    sélectionnez vos documents, puis posez votre question. L'IA analysera uniquement les fichiers sélectionnés.
+                  </p>
+                </div>
+              )}
+              
               <div className="flex flex-col gap-4">
                 {messages.map((msg, idx) => (
                   <motion.div
@@ -232,7 +285,7 @@ const ChatBotPanel: React.FC<Props & {
                   >
                     {msg.sender === "bot" ? (
                       <div
-                        className="rounded-2xl px-4 py-2 max-w-[80%] bg-gray-50 text-gray-900 self-start shadow-sm text-sm leading-relaxed chatbot-ia-bubble"
+                        className="rounded-2xl px-4 py-2 max-w-[80%] bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-gray-100 self-start shadow-sm text-sm leading-relaxed chatbot-ia-bubble"
                         style={{ wordBreak: 'break-word', overflowWrap: 'anywhere', fontFamily: 'Inter, Arial, sans-serif', margin: '0.5rem 0' }}
                         dangerouslySetInnerHTML={{ __html: markdownToCleanHtml(typeof msg.content === 'string' ? msg.content : String(msg.content)) }}
                       />
@@ -250,20 +303,20 @@ const ChatBotPanel: React.FC<Props & {
                         {suggestions && suggestions.length > 0 && (
                           <div className="flex flex-wrap gap-2">
                             {suggestions.map((s, i) => (
-                              <button key={i} className="px-3 py-1 rounded-full bg-blue-50 text-blue-700 text-xs hover:bg-blue-100 border border-blue-200 transition-colors">
+                              <button key={i} className="px-3 py-1 rounded-full bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 text-xs hover:bg-blue-100 dark:hover:bg-blue-900/50 border border-blue-200 dark:border-blue-700 transition-colors">
                                 {s}
                               </button>
                             ))}
                           </div>
                         )}
                         {explicability?.files && explicability.files.length > 0 && (
-                          <div className="text-xs text-gray-400 mt-1 flex items-center gap-2">
+                          <div className="text-xs text-gray-400 dark:text-gray-500 mt-1 flex items-center gap-2">
                             <span>Fichiers utilisés :</span>
                             {explicability.files.map((f: string, i: number) => (
-                              <span key={i} className="bg-gray-100 border border-gray-200 rounded px-2 py-0.5 text-gray-700 ml-1">{f}</span>
+                              <span key={i} className="bg-gray-100 dark:bg-gray-600 border border-gray-200 dark:border-gray-500 rounded px-2 py-0.5 text-gray-700 dark:text-gray-300 ml-1">{f}</span>
                             ))}
                             {explicability.prompt && onShowPromptModal && (
-                              <button className="ml-2 underline text-blue-500 text-xs" onClick={onShowPromptModal} title="Voir le prompt IA">Prompt IA</button>
+                              <button className="ml-2 underline text-blue-500 dark:text-blue-400 text-xs" onClick={onShowPromptModal} title="Voir le prompt IA">Prompt IA</button>
                             )}
                           </div>
                         )}
@@ -272,17 +325,17 @@ const ChatBotPanel: React.FC<Props & {
                   </motion.div>
                 ))}
                 {isTyping && (
-                  <div className="flex items-center gap-2 text-sm text-gray-500 animate-pulse">
+                  <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400 animate-pulse">
                     <Loader2 className="h-4 w-4 animate-spin" /> L'assistant réfléchit...
                   </div>
                 )}
                 <div ref={messagesEndRef} />
               </div>
             </div>
-            <div className="sticky bottom-0 z-10 px-4 py-5 border-t bg-white flex gap-2 items-center rounded-b-3xl">
+            <div className="sticky bottom-0 z-10 px-4 py-5 border-t bg-white dark:bg-gray-800 dark:border-gray-700 flex gap-2 items-center rounded-b-3xl">
               <input
                 type="text"
-                className="flex-1 rounded-full border px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sncf-red"
+                className="flex-1 rounded-full border px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sncf-red bg-white dark:bg-gray-700 text-gray-900 dark:text-white border-gray-300 dark:border-gray-600 placeholder-gray-500 dark:placeholder-gray-400"
                 placeholder="Posez une question sur l'affaire..."
                 value={inputValue}
                 onChange={onInputChange}
@@ -292,21 +345,39 @@ const ChatBotPanel: React.FC<Props & {
               />
               {onFileButtonClick && (
                 <button
-                  className="ml-1 p-2 rounded-full hover:bg-gray-100 transition-colors"
+                  className={`ml-1 p-2 rounded-full transition-all duration-200 relative group ${
+                    contextFiles.length > 0 
+                      ? 'bg-blue-100 dark:bg-blue-900/30 border-2 border-blue-300 dark:border-blue-600 hover:bg-blue-200 dark:hover:bg-blue-900/50' 
+                      : 'bg-gray-100 dark:bg-gray-700 border-2 border-gray-200 dark:border-gray-600 hover:bg-gray-200 dark:hover:bg-gray-600'
+                  }`}
                   onClick={onFileButtonClick}
                   type="button"
-                  title="Joindre un fichier"
+                  title={`Joindre un fichier${contextFiles.length > 0 ? ` (${contextFiles.length} fichier${contextFiles.length > 1 ? 's' : ''} joint${contextFiles.length > 1 ? 's' : ''})` : ''}`}
                 >
-                  <Paperclip className="h-5 w-5 text-sncf-red" />
+                  <Paperclip className={`h-5 w-5 transition-colors ${
+                    contextFiles.length > 0 ? 'text-blue-600 dark:text-blue-400' : 'text-gray-600 dark:text-gray-400 group-hover:text-sncf-red'
+                  }`} />
+                  {contextFiles.length > 0 && (
+                    <span className="absolute -top-2 -right-2 bg-blue-600 text-white text-xs rounded-full w-6 h-6 flex items-center justify-center font-medium shadow-lg">
+                      {contextFiles.length}
+                    </span>
+                  )}
+                  {/* Tooltip */}
+                  <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 bg-gray-900 dark:bg-gray-700 text-white dark:text-gray-200 text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap">
+                    {contextFiles.length > 0 
+                      ? `${contextFiles.length} fichier${contextFiles.length > 1 ? 's' : ''} joint${contextFiles.length > 1 ? 's' : ''}`
+                      : 'Joindre des fichiers'
+                    }
+                  </div>
                 </button>
               )}
               <button
-                className={`ml-1 p-2 rounded-full border ${readFiles ? 'bg-blue-50 border-blue-400' : 'bg-gray-100 border-gray-300'} hover:bg-blue-100 transition-colors`}
+                className={`ml-1 p-2 rounded-full border ${readFiles ? 'bg-blue-50 dark:bg-blue-900/30 border-blue-400 dark:border-blue-600' : 'bg-gray-100 dark:bg-gray-700 border-gray-300 dark:border-gray-600'} hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-colors`}
                 onClick={onToggleReadFiles}
                 type="button"
                 title="Activer/désactiver la lecture des fichiers"
               >
-                <FileText className={`h-5 w-5 ${readFiles ? 'text-blue-600' : 'text-gray-400'}`} />
+                <FileText className={`h-5 w-5 ${readFiles ? 'text-blue-600 dark:text-blue-400' : 'text-gray-400 dark:text-gray-500'}`} />
               </button>
               <button
                 className="ml-1 p-2 rounded-full bg-sncf-red hover:bg-red-700 disabled:opacity-60 transition-colors"

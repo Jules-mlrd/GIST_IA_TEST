@@ -24,8 +24,8 @@ export async function POST(req: Request) {
       listTxtFilesInS3(BUCKET_NAME),
     ]);
     // Filtrer par affaire si précisé
-    const filteredPdfFiles = affaire ? pdfFiles.filter(key => key.includes(affaire)) : pdfFiles;
-    const filteredTxtFiles = affaire ? txtFiles.filter(key => key.includes(affaire)) : txtFiles;
+    const filteredPdfFiles = affaire ? pdfFiles.filter(key => key.startsWith(`affaires/${affaire}/`)) : pdfFiles;
+    const filteredTxtFiles = affaire ? txtFiles.filter(key => key.startsWith(`affaires/${affaire}/`)) : txtFiles;
     const allFiles = [
       ...filteredPdfFiles.map((key) => ({ key, type: 'pdf' })),
       ...filteredTxtFiles.map((key) => ({ key, type: 'txt' })),

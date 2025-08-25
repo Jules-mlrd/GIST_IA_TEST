@@ -63,6 +63,13 @@
     --chart-3: 30 80% 55%;
     --chart-4: 280 65% 60%;
     --chart-5: 340 75% 55%;
+
+    /* GIST Colors - Dark Mode */
+    --gist-blue: 200 100% 60%;
+    --gist-light-blue: 200 100% 30%;
+    --gist-dark-blue: 200 100% 70%;
+    --gist-gray: 210 11% 40%;
+    --gist-dark-gray: 210 11% 85%;
   }
 }
 
@@ -75,7 +82,7 @@
     @apply border-border;
   }
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground transition-colors duration-200;
   }
 }
 
@@ -93,13 +100,25 @@
     border-radius: 3px;
   }
 
+  .dark .scrollbar-thin::-webkit-scrollbar-track {
+    background: #374151;
+  }
+
   .scrollbar-thin::-webkit-scrollbar-thumb {
     background: #c1c1c1;
     border-radius: 3px;
   }
 
+  .dark .scrollbar-thin::-webkit-scrollbar-thumb {
+    background: #6b7280;
+  }
+
   .scrollbar-thin::-webkit-scrollbar-thumb:hover {
     background: #a8a8a8;
+  }
+
+  .dark .scrollbar-thin::-webkit-scrollbar-thumb:hover {
+    background: #9ca3af;
   }
 
   .bg-gist-blue {
@@ -163,4 +182,53 @@
 /* Exemple d'utilisation correcte de @apply */
 .btn {
   @apply px-4 py-2 bg-blue-500 text-white rounded;
+}
+
+/* Styles pour le mode sombre */
+.dark body {
+  @apply bg-gray-900 text-white;
+}
+
+.dark .bg-white {
+  @apply bg-gray-800;
+}
+
+.dark .text-gray-900 {
+  @apply text-white;
+}
+
+.dark .text-gray-700 {
+  @apply text-gray-300;
+}
+
+.dark .text-gray-600 {
+  @apply text-gray-400;
+}
+
+.dark .text-gray-500 {
+  @apply text-gray-400;
+}
+
+.dark .border-gray-200 {
+  @apply border-gray-700;
+}
+
+.dark .border-gray-300 {
+  @apply border-gray-600;
+}
+
+.dark .bg-gray-50 {
+  @apply bg-gray-800;
+}
+
+.dark .bg-gray-100 {
+  @apply bg-gray-700;
+}
+
+.dark .hover\:bg-gray-200:hover {
+  @apply hover:bg-gray-600;
+}
+
+.dark .hover\:bg-gray-100:hover {
+  @apply hover:bg-gray-600;
 }

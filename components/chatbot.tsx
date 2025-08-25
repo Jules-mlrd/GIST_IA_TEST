@@ -52,6 +52,10 @@ const DEFAULT_USER_PREFS: UserPrefs = {
 };
 
 export function ChatBot({ affaireId, files, loading, affaireName }: Props & { affaireName?: string }) {
+  console.log('ChatBot - AffaireId:', affaireId);
+  console.log('ChatBot - Files reçus:', files);
+  console.log('ChatBot - Loading:', loading);
+  
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState("");
@@ -108,8 +112,24 @@ export function ChatBot({ affaireId, files, loading, affaireName }: Props & { af
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  useEffect(() => {
-  }, [affaireId]);
+  // Chargement de l'historique du chat depuis l'API Redis - DÉSACTIVÉ pour démarrer avec un chat vide
+  // useEffect(() => {
+  //   if (!affaireId) return;
+  //   fetch(`/api/chat?affaireId=${encodeURIComponent(affaireId)}`)
+  //     .then(res => res.json())
+  //     .then(data => {
+  //       console.log('Messages reçus de l\'API:', data);
+  //       if (Array.isArray(data.history) && data.history.length > 0) {
+  //         console.log('Historique valide, mise à jour des messages');
+  //         setMessages(data.history);
+  //       } else {
+  //         console.log('Historique vide ou invalide, garder les messages locaux');
+  //       }
+  //     })
+  //     .catch(error => {
+  //       console.error('Erreur lors du chargement de l\'historique:', error);
+  //     });
+  // }, [affaireId]);
 
   const handleFileSelect = (fileKey: string, checked: boolean) => {
     setSelectedFiles(prev => checked ? [...prev, fileKey] : prev.filter(k => k !== fileKey));
@@ -176,44 +196,60 @@ export function ChatBot({ affaireId, files, loading, affaireName }: Props & { af
   const handleSendMessage = async () => {
     if (!inputValue.trim()) return;
     const userMessage: MessageUser = {
-      id: `user-${messages.length}`,
+      id: `user-${Date.now()}`,
       content: inputValue,
       sender: "user",
       timestamp: new Date(),
     };
     setMessages(prev => [...prev, userMessage]);
+    const currentInputValue = inputValue;
     setInputValue("");
     setIsTyping(true);
 
     try {
+      console.log('Envoi du message:', currentInputValue);
+      console.log('Fichiers de contexte:', contextFiles);
+      console.log('Fichiers sélectionnés:', selectedFiles);
       const response = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          message: userMessage.content,
-          userId: "default",
           affaireId,
-          readFiles,
-          contextFiles: contextFiles.length > 0 ? contextFiles : undefined,
+          message: currentInputValue,
+          contextFiles: contextFiles, // Ajouter les fichiers sélectionnés
         }),
       });
-      if (!response.ok) throw new Error('Erreur API');
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.reply || 'Erreur API');
+      }
+      
       const data = await response.json();
-      setMessages(prev => [...prev, {
-        id: `bot-${prev.length+1}`,
-        content: typeof data.reply === 'string' ? data.reply : String(data.reply) || 'Pas de réponse reçue',
-        sender: "bot",
-        timestamp: new Date(),
-      } as MessageBot]);
+      console.log('Réponse de l\'API:', data);
+      
+      // Ajouter la réponse du bot directement
+      if (data.reply) {
+        const botMessage: MessageBot = {
+          id: `bot-${Date.now()}`,
+          content: data.reply,
+          sender: "bot",
+          timestamp: new Date(),
+        };
+        setMessages(prev => [...prev, botMessage]);
+      }
+      
       setSuggestions(Array.isArray(data.suggestions) ? data.suggestions : []);
       setExplicability(data.explicability || null);
     } catch (error) {
-      setMessages(prev => [...prev, {
-        id: `bot-${prev.length+1}`,
+      console.error('Erreur lors de l\'envoi du message:', error);
+      const errorMessage: MessageBot = {
+        id: `bot-error-${Date.now()}`,
         content: typeof error === 'string' ? error : String(error) || 'Erreur inconnue',
         sender: "bot",
         timestamp: new Date(),
-      } as MessageBot]);
+      };
+      setMessages(prev => [...prev, errorMessage]);
       setSuggestions([]);
       setExplicability(null);
     } finally {
@@ -252,6 +288,14 @@ export function ChatBot({ affaireId, files, loading, affaireName }: Props & { af
     return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
   };
 
+  const formatFileSize = (bytes: number) => {
+    if (bytes === 0) return '0 KB';
+    const k = 1024;
+    const sizes = ['KB', 'MB', 'GB', 'TB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  };
+
   return (
     <>
       <ChatBotPanel
@@ -286,51 +330,142 @@ export function ChatBot({ affaireId, files, loading, affaireName }: Props & { af
       />
       <ChatToggleButton isOpen={isOpen} onClick={() => setIsOpen(!isOpen)} />
       {showFileModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
-          <div className="bg-white rounded-2xl shadow-xl p-6 w-full max-w-md relative">
-            <button className="absolute top-2 right-2 p-2" onClick={handleCloseFileModal}><X className="h-5 w-5" /></button>
-            <h3 className="font-bold text-lg mb-4">Joindre des fichiers</h3>
-            <div className="mb-4">
-              <div className="font-semibold mb-2">Depuis le bucket S3 :</div>
-              <div className="max-h-40 overflow-y-auto space-y-1">
-                {files.map(f => (
-                  <label key={f.key} className="flex items-center gap-2 cursor-pointer text-sm">
-                    <input type="checkbox" checked={pendingContextFiles.includes(f.key)} onChange={() => handleS3FileToggle(f.key)} />
-                    <span>{f.name}</span>
-                    {pendingContextFiles.includes(f.key) && (
-                      <button className="ml-1" onClick={() => handleRemovePendingContextFile(f.key)}><X className="h-3 w-3" /></button>
-                    )}
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-2xl max-h-[85vh] overflow-hidden relative flex flex-col">
+            {/* Header */}
+            <div className="flex items-center justify-between mb-6 pb-4 border-b border-gray-200 flex-shrink-0">
+              <div>
+                <h3 className="font-bold text-xl text-gray-900">Joindre des fichiers</h3>
+                <p className="text-sm text-gray-500 mt-1">Sélectionnez les fichiers à utiliser dans la conversation</p>
+              </div>
+              <button 
+                className="p-2 hover:bg-gray-100 rounded-full transition-colors" 
+                onClick={handleCloseFileModal}
+              >
+                <X className="h-5 w-5 text-gray-500" />
+              </button>
+            </div>
+            
+            <div className="overflow-y-auto flex-1 pr-2 min-h-0">
+              {/* Fichiers actuellement joints */}
+              {contextFiles.length > 0 && (
+                <div className="mb-6">
+                  <div className="flex items-center gap-2 mb-3">
+                    <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                    <h4 className="font-semibold text-gray-900">Fichiers actuellement joints ({contextFiles.length})</h4>
+                  </div>
+                  <div className="space-y-2">
+                    {contextFiles.map(key => {
+                      const file = files.find(f => f.key === key);
+                      return (
+                        <div key={key} className="flex items-center justify-between bg-green-50 border border-green-200 rounded-lg px-4 py-3">
+                          <div className="flex items-center gap-3">
+                            <div className="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center">
+                              <FileText className="h-4 w-4 text-green-600" />
+                            </div>
+                            <div>
+                              <div className="font-medium text-gray-900 text-sm">{file ? file.name : key}</div>
+                              <div className="text-xs text-gray-500">
+                                {file ? `${file.type} • ${formatFileSize(file.size)}` : 'Fichier'}
+                              </div>
+                            </div>
+                          </div>
+                          <button 
+                            className="p-1 hover:bg-red-100 rounded-full transition-colors" 
+                            onClick={() => handleRemoveContextFile(key)}
+                            title="Retirer ce fichier"
+                          >
+                            <X className="h-4 w-4 text-red-500" />
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+              
+              {/* Fichiers disponibles depuis S3 */}
+              <div className="mb-6">
+                <div className="flex items-center gap-2 mb-3">
+                  <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                  <h4 className="font-semibold text-gray-900">Fichiers disponibles depuis S3</h4>
+                </div>
+                <div className="max-h-48 overflow-y-auto space-y-2 border border-gray-200 rounded-lg p-3">
+                  {files.filter(f => !contextFiles.includes(f.key)).map(f => (
+                    <label key={f.key} className="flex items-center gap-3 cursor-pointer hover:bg-gray-50 p-2 rounded-lg transition-colors">
+                      <input 
+                        type="checkbox" 
+                        checked={pendingContextFiles.includes(f.key)} 
+                        onChange={() => handleS3FileToggle(f.key)}
+                        className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                      />
+                      <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
+                        <FileText className="h-4 w-4 text-blue-600" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="font-medium text-gray-900 text-sm truncate">{f.name}</div>
+                        <div className="text-xs text-gray-500">{f.type} • {formatFileSize(f.size)}</div>
+                      </div>
+                    </label>
+                  ))}
+                  {files.filter(f => !contextFiles.includes(f.key)).length === 0 && (
+                    <div className="text-center py-8 text-gray-400">
+                      <FileText className="h-12 w-12 mx-auto mb-2 opacity-50" />
+                      <div className="text-sm">Aucun nouveau fichier disponible</div>
+                    </div>
+                  )}
+                </div>
+              </div>
+              
+              {/* Upload depuis l'ordinateur */}
+              <div className="mb-6">
+                <div className="flex items-center gap-2 mb-3">
+                  <div className="w-2 h-2 bg-purple-500 rounded-full"></div>
+                  <h4 className="font-semibold text-gray-900">Depuis mon ordinateur</h4>
+                </div>
+                <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-purple-400 transition-colors">
+                  <input 
+                    type="file" 
+                    multiple 
+                    onChange={handleLocalFileUpload} 
+                    disabled={uploading}
+                    className="hidden"
+                    id="file-upload"
+                  />
+                  <label htmlFor="file-upload" className="cursor-pointer">
+                    <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center mx-auto mb-3">
+                      <Paperclip className="h-6 w-6 text-purple-600" />
+                    </div>
+                    <div className="text-sm text-gray-600">
+                      {uploading ? 'Upload en cours...' : 'Cliquez pour sélectionner des fichiers'}
+                    </div>
+                    <div className="text-xs text-gray-400 mt-1">PDF, TXT, CSV, XLSX acceptés</div>
                   </label>
-                ))}
-                {files.length === 0 && <div className="text-gray-400 text-xs">Aucun fichier disponible</div>}
+                </div>
               </div>
             </div>
-            <div className="mb-4">
-              <div className="font-semibold mb-2">Depuis mon ordinateur :</div>
-              <input type="file" multiple onChange={handleLocalFileUpload} disabled={uploading} />
-            </div>
-            <div className="flex justify-end gap-2 mt-4">
-              <button className="px-4 py-2 rounded bg-gray-100 hover:bg-gray-200" onClick={handleCloseFileModal}>Fermer</button>
+            
+            {/* Footer */}
+            <div className="flex justify-end gap-3 pt-4 border-t border-gray-200 mt-6 flex-shrink-0">
+              <button 
+                className="px-6 py-2 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium transition-colors" 
+                onClick={handleCloseFileModal}
+              >
+                Annuler
+              </button>
               <button
-                className="px-4 py-2 rounded bg-sncf-red text-white font-bold hover:bg-red-700 disabled:opacity-60"
+                className={`px-6 py-2 rounded-lg font-medium transition-colors ${
+                  pendingContextFiles.length > 0 
+                    ? 'bg-blue-600 hover:bg-blue-700 text-white' 
+                    : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                }`}
                 onClick={handleValidateFileModal}
                 disabled={pendingContextFiles.length === 0}
-              >Valider</button>
+              >
+                Ajouter {pendingContextFiles.length > 0 ? `(${pendingContextFiles.length})` : ''}
+              </button>
             </div>
           </div>
-        </div>
-      )}
-      {contextFiles.length > 0 && (
-        <div className="fixed right-6 bottom-28 z-50 flex flex-wrap gap-2 max-w-md">
-          {contextFiles.map(key => {
-            const file = files.find(f => f.key === key);
-            return (
-              <span key={key} className="flex items-center bg-blue-50 border border-blue-200 text-blue-800 rounded-full px-3 py-1 text-xs">
-                {file ? file.name : key}
-                <button className="ml-1" onClick={() => handleRemoveContextFile(key)}><X className="h-3 w-3" /></button>
-              </span>
-            );
-          })}
         </div>
       )}
       {showPromptModal && explicability?.prompt && (

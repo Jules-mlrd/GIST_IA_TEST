@@ -5,6 +5,7 @@ import AffaireFilesClient from './AffaireFilesClient';
 import { useEffect, useState } from 'react';
 import { X } from 'lucide-react';
 import Link from "next/link";
+import AffaireNav from '@/components/AffaireNav';
 
 const FIELD_LABELS: { [key: string]: string } = {
   portefeuille_projet: 'Portefeuille projet',
@@ -122,40 +123,8 @@ export default function AffaireDetailClient({ affaire }: { affaire: any }) {
   }, [affaire.numero_affaire]);
 
   return (
-    <div className="relative py-8 px-2 text-base">
-      <nav className="flex gap-2 mb-8 border-b pb-2">
-        <Link href={`/affaires/${affaire.numero_affaire}`}
-          className="px-4 py-2 rounded-t-lg font-semibold text-gray-700 hover:bg-gray-100 border-b-2 border-transparent hover:border-blue-400 transition">
-          Détail
-        </Link>
-        <button
-          onClick={() => setShowFiles(v => !v)}
-          className={`px-4 py-2 rounded-t-lg font-semibold text-gray-700 hover:bg-gray-100 border-b-2 border-transparent hover:border-violet-400 transition ${showFiles ? 'border-violet-600 bg-violet-50' : ''}`}
-        >
-          Fichiers
-        </button>
-        <Link href={`/ai-dashboard?affaire=${affaire.numero_affaire}`}
-          className="px-4 py-2 rounded-t-lg font-semibold text-blue-700 hover:bg-blue-50 border-b-2 border-transparent hover:border-blue-600 transition">
-          Dashboard IA
-        </Link>
-        {/* Ajout bouton Synthèse */}
-        <Link href={`/affaires/${affaire.numero_affaire}/synthese`}
-          className="px-4 py-2 rounded-t-lg font-semibold text-indigo-700 hover:bg-indigo-50 border-b-2 border-transparent hover:border-indigo-600 transition">
-          Synthèse
-        </Link>
-        <Link href={`/contacts?affaire=${affaire.numero_affaire}`}
-          className="px-4 py-2 rounded-t-lg font-semibold text-green-700 hover:bg-green-50 border-b-2 border-transparent hover:border-green-600 transition">
-          Contacts
-        </Link>
-        <Link href={`/risks?affaire=${affaire.numero_affaire}`}
-          className="px-4 py-2 rounded-t-lg font-semibold text-orange-700 hover:bg-orange-50 border-b-2 border-transparent hover:border-orange-600 transition">
-          Risques
-        </Link>
-        <Link href={`/affaires/${affaire.numero_affaire}/timeline`}
-          className="px-4 py-2 rounded-t-lg font-semibold text-purple-700 hover:bg-purple-50 border-b-2 border-transparent hover:border-purple-600 transition">
-          Timeline
-        </Link>
-      </nav>
+    <div className="w-[90vw] max-w-none mx-auto py-8 px-2 md:px-8 animate-fade-in text-base">
+      <AffaireNav numero_affaire={affaire.numero_affaire} active="detail" />
       <div className="w-full bg-black px-6 py-4 mb-6">
         <h1 className="text-xl md:text-2xl font-bold text-white text-center whitespace-nowrap overflow-x-auto">
           {affaire.titre || 'Affaire'} ({affaire.numero_affaire})

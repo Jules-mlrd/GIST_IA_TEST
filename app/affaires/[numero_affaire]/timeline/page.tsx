@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { CheckCircle, AlertCircle, Clock, Calendar, ChevronLeft, ChevronRight } from "lucide-react";
+import { CheckCircle, AlertCircle, Clock, Calendar, ChevronLeft, ChevronRight, RefreshCw, Loader2 } from "lucide-react";
 import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -55,33 +55,24 @@ export default function TimelineAffairePage() {
     if (affaire) fetchTimeline();
   }, [affaire]);
 
+  // Bouton Rafraîchir harmonisé (identique à la synthèse)
+  const refreshButton = (
+    <Button
+      variant="outline"
+      className="flex items-center gap-2 border-purple-700 text-purple-700 hover:bg-purple-100/10 hover:text-purple-700 hover:border-purple-700 transition"
+      onClick={() => { setRefreshing(true); fetchTimeline(true); }}
+      disabled={refreshing || loading}
+      title="Rafraîchir la timeline IA"
+    >
+      {refreshing ? <Loader2 className="animate-spin h-4 w-4" /> : <RefreshCw className="h-4 w-4" />}
+      Rafraîchir
+    </Button>
+  );
+
   return (
     <AffaireLayout numero_affaire={affaire} active="timeline">
       <h1 className="text-2xl font-bold text-purple-800 mb-6 text-center">Timeline de l'affaire {affaire && <span className="text-gray-500 font-normal ml-2">{affaire}</span>}</h1>
-      <div className="flex justify-between items-center mb-4">
-        <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" disabled>
-            <ChevronLeft className="h-4 w-4 mr-1" />
-            Mois précédent
-          </Button>
-          <Badge variant="outline" className="text-sm px-3 py-1">
-            <Calendar className="h-4 w-4 mr-2" />
-            Timeline IA
-          </Badge>
-          <Button variant="outline" size="sm" disabled>
-            Mois suivant
-            <ChevronRight className="h-4 w-4 ml-1" />
-          </Button>
-        </div>
-        <Button
-          className="bg-sncf-red hover:bg-red-700"
-          onClick={() => { setRefreshing(true); fetchTimeline(true); }}
-          disabled={refreshing || loading}
-        >
-          <Clock className="mr-2 h-4 w-4" />
-          {refreshing ? "Rafraîchissement..." : "Rafraîchir la timeline"}
-        </Button>
-      </div>
+      <div className="flex justify-end mb-4">{refreshButton}</div>
       {loading ? (
         <div className="text-center text-gray-500 py-10">Chargement de la timeline IA...</div>
       ) : error ? (

@@ -278,27 +278,27 @@ export default function ProjectSelectionPage() {
   const [syncResult, setSyncResult] = useState<string | null>(null);
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex flex-col">
       {/* Cadre de filtrage */}
       <main className="flex-1 w-full py-10 px-0">
-        <Card className="w-full max-w-6xl mx-auto p-6 md:p-10 bg-white border border-gray-200 rounded-xl shadow-sm">
-            <h2 className="text-lg font-semibold text-gray-900 mb-6">Affaires</h2>
+        <Card className="w-full max-w-6xl mx-auto p-6 md:p-10 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-sm">
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-6">Affaires</h2>
             <form className="grid grid-cols-1 gap-6" onSubmit={handleSearch}>
               <div className="grid grid-cols-1 md:grid-cols-4 gap-6 w-full">
                 {/* Libellé */}
                 <div className="flex flex-col gap-2">
-                  <label htmlFor="libelle" className="text-gray-700 font-medium">Libellé</label>
+                  <label htmlFor="libelle" className="text-gray-700 dark:text-gray-300 font-medium">Libellé</label>
                   <Input id="libelle" name="libelle" value={filters.libelle} onChange={handleChange} placeholder="N° Affaire, compte, titre de la prestation" />
                 </div>
                 {/* Référent autocomplete */}
                 <div className="flex flex-col gap-2 relative">
-                  <label htmlFor="referent" className="text-gray-700 font-medium">Référent UP ou RA (Pilote)</label>
+                  <label htmlFor="referent" className="text-gray-700 dark:text-gray-300 font-medium">Référent UP ou RA (Pilote)</label>
                   <input
                     id="referent"
                     name="referent"
                     type="text"
                     autoComplete="off"
-                    className="border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-gist-blue"
+                    className="border border-gray-300 dark:border-gray-600 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-gist-blue bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400"
                     placeholder="Tapez ou sélectionnez un référent..."
                     value={referentInput}
                     onChange={e => {
@@ -311,11 +311,11 @@ export default function ProjectSelectionPage() {
                     ref={referentRef}
                   />
                   {referentDropdown && filteredReferents.length > 0 && (
-                    <ul className="absolute left-0 w-full mt-2 z-20 bg-white bg-opacity-95 border border-gray-200 rounded-md shadow-lg max-h-40 overflow-auto">
+                    <ul className="absolute left-0 w-full mt-2 z-20 bg-white dark:bg-gray-700 bg-opacity-95 dark:bg-opacity-95 border border-gray-200 dark:border-gray-600 rounded-md shadow-lg max-h-40 overflow-auto">
                       {filteredReferents.map((option, idx) => (
                         <li
                           key={option}
-                          className={`px-3 py-2 cursor-pointer hover:bg-gist-blue/10 ${idx === 0 ? 'bg-gist-blue/10' : ''}`}
+                          className={`px-3 py-2 cursor-pointer hover:bg-gist-blue/10 dark:hover:bg-gist-blue/20 text-gray-900 dark:text-gray-100 ${idx === 0 ? 'bg-gist-blue/10 dark:bg-gist-blue/20' : ''}`}
                           onMouseDown={() => {
                             setReferentInput(option);
                             setFilters({ ...filters, referent: option });
@@ -328,10 +328,10 @@ export default function ProjectSelectionPage() {
                     </ul>
                   )}
                   {referentDropdown && !referentLoading && filteredReferents.length === 0 && (
-                    <div className="absolute left-0 w-full mt-2 z-20 bg-white border border-gray-200 rounded-md shadow-lg px-3 py-2 text-gray-400 text-sm">Aucun référent trouvé</div>
+                    <div className="absolute left-0 w-full mt-2 z-20 bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-md shadow-lg px-3 py-2 text-gray-400 dark:text-gray-500 text-sm">Aucun référent trouvé</div>
                   )}
                   {referentDropdown && referentLoading && (
-                    <div className="absolute left-0 w-full mt-2 z-20 bg-white border border-gray-200 rounded-md shadow-lg px-3 py-2 text-gray-400 text-sm">Chargement...</div>
+                    <div className="absolute left-0 w-full mt-2 z-20 bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-md shadow-lg px-3 py-2 text-gray-400 dark:text-gray-500 text-sm">Chargement...</div>
                   )}
                 </div>
                 {/* État autocomplete */}

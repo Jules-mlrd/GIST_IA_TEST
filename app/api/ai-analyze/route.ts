@@ -183,8 +183,44 @@ function extractDevisData(text: string) {
  * Utilise OpenAI pour extraire une timeline structurée d'un texte de projet.
  * Retourne un tableau d'objets { date, label, description? }.
  */
-export async function extractTimelineWithLLM(text: string, apiKey?: string): Promise<Array<{ date: string, label: string, description?: string }>> {
-  const prompt = `Voici un texte extrait de documents de projet SNCF :\n\n"""\n${text}\n"""\n\nAnalyse ce texte et extrais une timeline structurée des événements, jalons ou étapes importantes du projet.\nPour chaque événement, donne :\n- date (si connue, sinon "inconnue")\n- label (titre court de l'événement)\n- description (facultatif, phrase explicative)\n\nRetourne uniquement un tableau JSON strictement valide, exemple :\n[\n  { "date": "2024-01-15", "label": "Étude de faisabilité", "description": "Analyse des besoins et validation de la faisabilité." },\n  { "date": "2024-02-28", "label": "Validation technique" }\n]\n\nRéponse :`;
+export async function extractTimelineWithLLM(text: string, apiKey?: string): Promise<Array<{ date: string, label: string, description?: string, type?: string }>> {
+  const prompt = `Tu es un assistant expert en gestion de projet SNCF.
+
+Contexte :
+- Tu analyses des documents relatifs à un projet SNCF (travaux, études, opérations ferroviaires, etc.).
+- Les éléments majeurs d'une affaire incluent : jalons, validations, réunions clés, livraisons, démarrages, réceptions, clôtures, incidents majeurs, décisions importantes, blocages, changements majeurs, alertes, etc.
+- Les dates sont parfois imprécises ou absentes, mais il faut toujours restituer l'ordre chronologique.
+
+Ta tâche :
+- Lis attentivement le texte ci-dessous et extrais une timeline structurée de TOUS les événements majeurs du projet.
+- Pour chaque événement, fournis :
+  - date (format AAAA-MM-JJ si possible, sinon "inconnue")
+  - label (titre court, explicite, sans abréviation)
+  - description (phrase explicative, contexte ou impact)
+  - type (choisis parmi : "jalon", "réunion", "livraison", "validation", "incident", "décision", "blocage", "changement", "alerte", "autre")
+- Organise la timeline de façon strictement chronologique (du plus ancien au plus récent).
+- Sois exhaustif : n'oublie aucun jalon, validation, incident, décision, blocage ou changement majeur mentionné dans le texte.
+- Si plusieurs événements ont la même date, trie-les par importance (livraison > validation > décision > réunion > incident > blocage > autre).
+- Si aucune date n'est trouvée, indique "inconnue" mais conserve l'ordre logique.
+
+Exemple de réponse attendue :
+[
+  { "date": "2024-01-15", "label": "Étude de faisabilité validée", "description": "Validation du dossier d'étude par la MOA.", "type": "validation" },
+  { "date": "2024-02-10", "label": "Réunion de lancement", "description": "Réunion de démarrage avec tous les acteurs du projet.", "type": "réunion" },
+  { "date": "2024-02-15", "label": "Décision de changement de fournisseur", "description": "Changement de prestataire suite à un incident.", "type": "décision" },
+  { "date": "2024-03-01", "label": "Début des travaux", "description": "Démarrage effectif des travaux sur site.", "type": "jalon" },
+  { "date": "2024-03-10", "label": "Blocage administratif", "description": "Blocage du chantier suite à un retard d'autorisation.", "type": "blocage" },
+  { "date": "2024-04-20", "label": "Livraison du matériel", "description": "Réception des équipements nécessaires au chantier.", "type": "livraison" },
+  { "date": "inconnue", "label": "Incident technique majeur", "description": "Blocage du chantier suite à un incident sur la voie.", "type": "incident" }
+]
+
+Texte à analyser :
+"""
+${text}
+"""
+
+Réponds uniquement par un tableau JSON strictement valide, sans texte autour.
+Réponse :`;
   const response = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
     headers: {
@@ -198,7 +234,7 @@ export async function extractTimelineWithLLM(text: string, apiKey?: string): Pro
         { role: 'user', content: prompt },
       ],
       temperature: 0.2,
-      max_tokens: 800,
+      max_tokens: 1000,
     }),
   });
   if (!response.ok) throw new Error('Erreur OpenAI extraction timeline');
@@ -220,8 +256,8 @@ export async function extractTimelineWithLLM(text: string, apiKey?: string): Pro
  * Utilise OpenAI pour extraire les tâches projet d'un texte.
  * Retourne un tableau d'objets { id, name, status, assignee, startDate, endDate, description? }.
  */
-export async function extractTasksWithLLM(text: string, apiKey?: string): Promise<Array<{ id: string, name: string, status: string, assignee?: string, startDate?: string, endDate?: string, description?: string }>> {
-  const prompt = `Voici un texte extrait de documents de projet SNCF :\n\n"""\n${text}\n"""\n\nAnalyse ce texte et extrais la liste structurée des tâches du projet.\nPour chaque tâche, donne :\n- id (identifiant ou numéro, ou "T-XXX" si inconnu)\n- name (titre court de la tâche)\n- status (completed, in-progress, pending)\n- assignee (personne assignée, si connue)\n- startDate (si connue)\n- endDate (si connue)\n- description (facultatif, phrase explicative)\n\nRetourne uniquement un tableau JSON strictement valide, exemple :\n[\n  { "id": "T-001", "name": "Analyse des besoins", "status": "completed", "assignee": "Marie Dubois", "startDate": "2024-01-10", "endDate": "2024-01-15", "description": "Analyse des besoins utilisateurs." },\n  { "id": "T-002", "name": "Développement", "status": "in-progress" }\n]\n\nRéponse :`;
+export async function extractTasksWithLLM(text: string, apiKey?: string): Promise<Array<{ id: string, name: string, status: string, assignee?: string, startDate?: string, endDate?: string, description?: string, icon?: string }>> {
+  const prompt = `Tu es un assistant expert en gestion de projet SNCF.\n\nContexte :\n- Tu analyses des documents de projet SNCF (travaux, études, opérations, etc.).\n- Les tâches peuvent être de différents types : réunion, validation, livraison, développement, contrôle, etc.\n- Le statut doit être explicite : "completed" (réalisée), "in-progress" (en cours), "pending" (à venir).\n\nTa tâche :\n- Lis attentivement le texte ci-dessous et extrais la liste structurée des tâches du projet.\n- Pour chaque tâche, fournis :\n  - id (identifiant ou numéro, ou "T-XXX" si inconnu)\n  - name (titre court, explicite, sans abréviation)\n  - status (completed, in-progress, pending)\n  - assignee (personne assignée, si connue)\n  - startDate (si connue)\n  - endDate (si connue)\n  - description (facultatif, phrase explicative)\n  - icon (emoji ou nom d'icône pertinent selon le type ou le statut, ex : "✅" pour completed, "🕒" pour in-progress, "📅" pour réunion, "🚚" pour livraison, "⚠️" pour blocage, etc.)\n- Détecte les tâches même si elles sont mal formulées ou implicites.\n- Structure la réponse en un tableau JSON strictement valide, un objet par tâche.\n- Trie les tâches par date de début croissante si possible.\n\nExemple de réponse attendue :\n[\n  { "id": "T-001", "name": "Analyse des besoins", "status": "completed", "assignee": "Marie Dubois", "startDate": "2024-01-10", "endDate": "2024-01-15", "description": "Analyse des besoins utilisateurs.", "icon": "✅" },\n  { "id": "T-002", "name": "Réunion de lancement", "status": "completed", "startDate": "2024-01-20", "icon": "📅" },\n  { "id": "T-003", "name": "Développement", "status": "in-progress", "icon": "🕒" },\n  { "id": "T-004", "name": "Livraison du matériel", "status": "pending", "icon": "🚚" }\n]\n\nTexte à analyser :\n"""\n${text}\n"""\n\nRéponds uniquement par un tableau JSON strictement valide, sans texte autour.\nRéponse :`;
   const response = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
     headers: {

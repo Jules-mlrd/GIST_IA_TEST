@@ -147,6 +147,7 @@ export async function extractRisksWithLLM(text: string, apiKey?: string): Promis
 
 Ta tâche :
 - Lis attentivement le texte ci-dessous et détecte tous les risques projet, même s'ils sont implicites, mal formulés ou indirects.
+- Si aucun risque n'est explicitement présent, invente au moins un risque plausible pour ce type de document/projet, en t'appuyant sur les contextes habituels SNCF (retards, dépendances, sécurité, environnement, etc.).
 - Pour chaque risque identifié, fournis un objet avec les champs suivants :
   - description : reformule le risque de façon claire et concise (une phrase)
   - criticite : choisis parmi "faible", "moyen", "élevé", "critique" selon la gravité ET la probabilité (voir critères ci-dessous)
@@ -223,24 +224,24 @@ export async function getCache(key: string): Promise<any | null> {
 }
 
 export async function setCache(key: string, value: any, ttlSeconds?: number) {
-  await redis.set(key, typeof value === 'string' ? value : JSON.stringify(value));
+  await redis.set(String(key), typeof value === 'string' ? value : JSON.stringify(value));
   if (ttlSeconds) {
-    await redis.expire(key, ttlSeconds);
+    await redis.expire(String(key), ttlSeconds);
   }
 }
 
 export async function logMetric(key: string, value: number) {
-  await redis.incrby(key, value);
+  await redis.incrby(String(key), value);
 }
 
 export async function logTiming(key: string, durationMs: number) {
-  await redis.incrby(`${key}:sum`, durationMs);
-  await redis.incrby(`${key}:count`, 1);
+  await redis.incrby(`${String(key)}:sum`, durationMs);
+  await redis.incrby(`${String(key)}:count`, 1);
 }
 
 export async function getTimingStats(key: string) {
-  const sum = parseInt(await redis.get(`${key}:sum`) || '0', 10);
-  const count = parseInt(await redis.get(`${key}:count`) || '0', 10);
+  const sum = parseInt(await redis.get(`${String(key)}:sum`) || '0', 10);
+  const count = parseInt(await redis.get(`${String(key)}:count`) || '0', 10);
   return { avg: count ? sum / count : 0, count, sum };
 }
 
